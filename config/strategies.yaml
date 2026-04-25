@@ -1,0 +1,71 @@
+# Strategy configuration — edit here, no code restart needed (reloaded every 60s).
+# Each strategy can be enabled/disabled and tuned independently.
+
+# ── Global risk limits ────────────────────────────────────────────────────
+risk:
+  max_pct_per_trade: 0.02          # 2% of capital per trade
+  max_open_positions: 10
+  max_exposure_per_market: 0.05    # 5% of capital in one market
+  max_drawdown_daily: 0.05         # kill switch at 5% daily drawdown
+  min_liquidity_usd: 5000          # reject markets with less than $5k liquidity
+  min_market_depth_usd: 500        # orderbook depth needed to exit position
+  min_time_to_resolution_buffer_minutes: 30  # don't enter if market resolves in < 30min
+
+# ── Wallet scoring filters ────────────────────────────────────────────────
+scoring:
+  min_trades: 50
+  min_sharpe: 1.0
+  max_drawdown: 0.30
+  max_median_holding_minutes: 2880   # 48h — rejects swing traders
+  min_pct_closed_under_24h: 0.60
+
+# ── Strategies ────────────────────────────────────────────────────────────
+strategies:
+  whale_copy:
+    enabled: true
+    min_trade_size_usd: 1000          # only copy large entries
+    min_wallet_sharpe: 1.2
+    max_wallet_median_holding_minutes: 720   # 12h — tight filter
+    max_holding_minutes: 240           # force exit after 4h
+    confidence_weight: 0.35
+    position_size_pct: 0.02            # 2% of capital
+    tp_pct: 0.15                       # take profit at +15%
+    sl_pct: 0.07                       # stop loss at -7%
+
+  consensus:
+    enabled: true
+    min_wallets: 2                     # need 2+ wallets on same side
+    time_window_minutes: 10            # within 10 min window
+    max_holding_minutes: 180           # force exit after 3h
+    confidence_weight: 0.30
+    position_size_pct: 0.02
+    tp_pct: 0.12
+    sl_pct: 0.06
+
+  fade_late:
+    enabled: false                     # disabled until backtested
+    min_delay_minutes: 30              # trader entered >= 30min after initial move
+    max_holding_minutes: 120           # force exit after 2h
+    confidence_weight: 0.20
+    position_size_pct: 0.01            # smaller size — contrarian
+    tp_pct: 0.10
+    sl_pct: 0.05
+
+  momentum_odds:
+    enabled: true
+    min_odds_move_pct: 5               # odds moved >= 5% in last 30min
+    odds_window_minutes: 30
+    require_whale_confirmation: true
+    max_holding_minutes: 60            # force exit after 1h — tightest
+    confidence_weight: 0.30
+    position_size_pct: 0.015
+    tp_pct: 0.10
+    sl_pct: 0.05
+
+# ── Exit manager ──────────────────────────────────────────────────────────
+exit:
+  poll_interval_seconds: 10           # check open positions every 10s
+  trailing_stop_enabled: true
+  trailing_stop_activation_pct: 0.10  # activate trailing stop at +10%
+  trailing_stop_distance_pct: 0.05    # trail 5% from peak
+  expiry_close_buffer_minutes: 360    # close 6h before market end_date

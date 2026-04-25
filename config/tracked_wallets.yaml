@@ -1,0 +1,15 @@
+# Wallets being tracked by the bot.
+# Populated by scripts/discover_wallets.py — edit manually to add/remove.
+#
+# Fields:
+#   address: wallet address (proxy or owner, tracker checks both)
+#   label:   optional human-readable name
+#   source:  how it was discovered (manual | discovery_script)
+
+wallets: []
+
+# Example:
+# wallets:
+#   - address: "0xabc123..."
+#     label: "whale_trader_1"
+#     source: "discovery_script"
