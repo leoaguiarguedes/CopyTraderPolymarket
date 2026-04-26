@@ -1,0 +1,273 @@
+"""Execution worker — consumes signals stream, validates with risk manager, executes.
+
+Redis Stream layout:
+  consumed:  signals    (group: execution_workers)
+  published: positions  (new/updated position JSON)
+
+Also runs the exit manager as a background task.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import sys
+from datetime import datetime, timezone
+from decimal import Decimal
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import redis.asyncio as aioredis
+
+from app.config import get_settings
+from app.data.models import OrderSide
+from app.data.polymarket_rest import PolymarketRestClient
+from app.execution.exit_manager import ExitManager
+from app.execution.paper_executor import PaperExecutor
+from app.risk.kill_switch import KillSwitch
+from app.risk.risk_manager import RiskManager
+from app.signals.models import Signal, SignalStatus
+from app.storage.db import AsyncSessionFactory
+from app.storage import models as orm
+from app.utils.logger import configure_logging, get_logger
+
+log = get_logger(__name__)
+
+_STREAM_IN = "signals"
+_STREAM_POSITIONS = "positions"
+_GROUP = "execution_workers"
+_CONSUMER = "execution_worker_1"
+_BATCH_SIZE = 50
+_BLOCK_MS = 1000
+
+
+class ExecutionWorker:
+    def __init__(self) -> None:
+        self._s = get_settings()
+        self._r: aioredis.Redis | None = None
+        self._rest = PolymarketRestClient(self._s)
+
+    async def start(self) -> None:
+        self._r = aioredis.from_url(self._s.redis_url, decode_responses=False)
+        ks = KillSwitch(self._r)
+        executor = PaperExecutor(self._rest)
+        risk = RiskManager(ks)
+        risk.capital_usd = self._s.initial_capital_usd
+
+        exit_mgr = ExitManager(
+            executor=executor,
+            kill_switch=ks,
+            rest_client=self._rest,
+            on_close=self._on_position_closed,
+        )
+
+        # Create consumer group
+        try:
+            await self._r.xgroup_create(_STREAM_IN, _GROUP, id="$", mkstream=True)
+        except aioredis.ResponseError:
+            pass
+
+        log.info("execution_worker.started", mode=self._s.execution_mode.value)
+
+        # Start exit manager background task
+        asyncio.create_task(exit_mgr.run_forever())
+
+        while True:
+            try:
+                messages = await self._r.xreadgroup(
+                    _GROUP, _CONSUMER,
+                    streams={_STREAM_IN: ">"},
+                    count=_BATCH_SIZE,
+                    block=_BLOCK_MS,
+                )
+                if not messages:
+                    continue
+
+                for _stream, entries in messages:
+                    for msg_id, fields in entries:
+                        await self._process_signal(
+                            msg_id, fields, risk, executor, exit_mgr
+                        )
+                        await self._r.xack(_STREAM_IN, _GROUP, msg_id)
+
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                log.error("execution_worker.error", error=str(exc))
+                await asyncio.sleep(1)
+
+    async def _process_signal(
+        self,
+        msg_id: bytes,
+        fields: dict,
+        risk: RiskManager,
+        executor: PaperExecutor,
+        exit_mgr: ExitManager,
+    ) -> None:
+        try:
+            data = json.loads(fields.get(b"data", b"{}"))
+        except Exception:
+            return
+
+        sig = _dict_to_signal(data)
+        if sig is None:
+            return
+
+        # Provide current open market ids to risk manager
+        risk.open_positions = {
+            pid: {"market_id": p.market_id}
+            for pid, p in exit_mgr.positions.items()
+        }
+
+        decision = await risk.validate(sig, market=None, orderbook=None)
+
+        # Persist signal to DB
+        await self._persist_signal(sig, decision.approved, decision.reason)
+
+        if not decision.approved:
+            log.info(
+                "execution_worker.signal_rejected",
+                signal_id=sig.signal_id[:8],
+                reason=decision.reason,
+            )
+            return
+
+        # Open position
+        position = await executor.open_position(sig, risk.capital_usd)
+        exit_mgr.positions[position.position_id] = position
+
+        # Persist position
+        await self._persist_position(position)
+
+        # Notify via stream
+        assert self._r is not None
+        await self._r.xadd(
+            _STREAM_POSITIONS,
+            {"data": json.dumps(_position_to_dict(position, "opened"))},
+        )
+
+    async def _on_position_closed(self, position) -> None:
+        await self._persist_position(position, update=True)
+        assert self._r is not None
+        await self._r.xadd(
+            _STREAM_POSITIONS,
+            {"data": json.dumps(_position_to_dict(position, "closed"))},
+        )
+
+    async def _persist_signal(self, sig: Signal, approved: bool, reason: str) -> None:
+        status = "approved" if approved else "rejected"
+        try:
+            async with AsyncSessionFactory() as session:
+                record = orm.Signal(
+                    signal_id=sig.signal_id,
+                    strategy=sig.strategy,
+                    market_id=sig.market_id,
+                    asset_id=sig.asset_id,
+                    side=sig.side.value,
+                    confidence=Decimal(str(sig.confidence)),
+                    entry_price=sig.entry_price,
+                    size_pct=Decimal(str(sig.size_pct)),
+                    tp_pct=Decimal(str(sig.tp_pct)),
+                    sl_pct=Decimal(str(sig.sl_pct)),
+                    max_holding_minutes=sig.max_holding_minutes,
+                    source_wallet=sig.source_wallet,
+                    status=status,
+                    reject_reason="" if approved else reason,
+                    reason=sig.reason,
+                    market_question=sig.market_question,
+                )
+                session.add(record)
+                await session.commit()
+        except Exception as exc:
+            log.warning("execution_worker.persist_signal_failed", error=str(exc)[:80])
+
+    async def _persist_position(self, position, update: bool = False) -> None:
+        try:
+            async with AsyncSessionFactory() as session:
+                if update:
+                    record = await session.get(orm.Position, position.position_id)
+                    if record:
+                        record.closed_at = position.closed_at
+                        record.exit_price = position.exit_price
+                        record.realized_pnl_usd = position.realized_pnl_usd
+                        record.exit_reason = position.exit_reason
+                        await session.commit()
+                        return
+                record = orm.Position(
+                    position_id=position.position_id,
+                    signal_id=position.signal_id,
+                    strategy=position.strategy,
+                    market_id=position.market_id,
+                    asset_id=position.asset_id,
+                    side=position.side,
+                    entry_price=position.entry_price,
+                    size_usd=position.size_usd,
+                    size_tokens=position.size_tokens,
+                    tp_price=position.tp_price,
+                    sl_price=position.sl_price,
+                    max_holding_minutes=position.max_holding_minutes,
+                    opened_at=position.opened_at,
+                    closed_at=position.closed_at,
+                    exit_price=position.exit_price,
+                    realized_pnl_usd=position.realized_pnl_usd,
+                    exit_reason=position.exit_reason,
+                    execution_mode=self._s.execution_mode.value,
+                )
+                session.add(record)
+                await session.commit()
+        except Exception as exc:
+            log.warning("execution_worker.persist_position_failed", error=str(exc)[:80])
+
+
+def _dict_to_signal(data: dict) -> Signal | None:
+    try:
+        return Signal(
+            signal_id=data["signal_id"],
+            strategy=data["strategy"],
+            market_id=data["market_id"],
+            asset_id=data["asset_id"],
+            side=OrderSide(data["side"]),
+            confidence=float(data["confidence"]),
+            entry_price=Decimal(str(data["entry_price"])),
+            size_pct=float(data["size_pct"]),
+            tp_pct=float(data["tp_pct"]),
+            sl_pct=float(data["sl_pct"]),
+            max_holding_minutes=int(data["max_holding_minutes"]),
+            source_wallet=data["source_wallet"],
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            reason=data.get("reason", ""),
+            market_question=data.get("market_question", ""),
+        )
+    except Exception as exc:
+        log.warning("execution_worker.parse_signal_failed", error=str(exc)[:80])
+        return None
+
+
+def _position_to_dict(position, event: str) -> dict:
+    return {
+        "event": event,
+        "position_id": position.position_id,
+        "strategy": position.strategy,
+        "market_id": position.market_id,
+        "side": position.side,
+        "entry_price": str(position.entry_price),
+        "size_usd": str(position.size_usd),
+        "tp_price": str(position.tp_price),
+        "sl_price": str(position.sl_price),
+        "max_holding_minutes": position.max_holding_minutes,
+        "opened_at": position.opened_at.isoformat(),
+        "closed_at": position.closed_at.isoformat() if position.closed_at else None,
+        "exit_price": str(position.exit_price) if position.exit_price else None,
+        "realized_pnl_usd": str(position.realized_pnl_usd) if position.realized_pnl_usd else None,
+        "exit_reason": position.exit_reason,
+    }
+
+
+async def main() -> None:
+    configure_logging()
+    worker = ExecutionWorker()
+    await worker.start()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

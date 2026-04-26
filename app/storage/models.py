@@ -111,3 +111,65 @@ class Trade(Base):
         Index("ix_trades_wallet_timestamp", "wallet_address", "timestamp"),
         Index("ix_trades_market_timestamp", "market_id", "timestamp"),
     )
+
+
+class Signal(Base):
+    __tablename__ = "signals"
+
+    signal_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    strategy: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    market_id: Mapped[str] = mapped_column(String(66), nullable=False, index=True)
+    asset_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    side: Mapped[str] = mapped_column(String(10), nullable=False)
+    confidence: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
+    entry_price: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    size_pct: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False)
+    tp_pct: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False)
+    sl_pct: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False)
+    max_holding_minutes: Mapped[int] = mapped_column(nullable=False)
+    source_wallet: Mapped[str] = mapped_column(String(42), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
+    reject_reason: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    market_question: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False, index=True
+    )
+
+    __table_args__ = (
+        Index("ix_signals_strategy_created", "strategy", "created_at"),
+    )
+
+
+class Position(Base):
+    __tablename__ = "positions"
+
+    position_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    signal_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("signals.signal_id"), nullable=False, index=True
+    )
+    strategy: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    market_id: Mapped[str] = mapped_column(String(66), nullable=False, index=True)
+    asset_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    side: Mapped[str] = mapped_column(String(10), nullable=False)
+    entry_price: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    size_usd: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False)
+    size_tokens: Mapped[Decimal] = mapped_column(Numeric(30, 8), nullable=False)
+    tp_price: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    sl_price: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    max_holding_minutes: Mapped[int] = mapped_column(nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    exit_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
+    realized_pnl_usd: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    exit_reason: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    execution_mode: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="paper"  # paper | live
+    )
+
+    __table_args__ = (
+        Index("ix_positions_opened_at", "opened_at"),
+        Index("ix_positions_market_open", "market_id", "closed_at"),
+    )
