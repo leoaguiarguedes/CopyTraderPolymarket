@@ -15,6 +15,7 @@ import asyncio
 import json
 import signal
 import sys
+import hashlib
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -171,7 +172,7 @@ async def _fetch_recent_fills(
     for side in ("maker", "taker"):
         try:
             result = await subgraph._query(
-                subgraph._s.subgraph_orderbook_url,
+                subgraph._s.subgraph_url,
                 _FILLS_QUERY % {"side": side},
                 vars_,
                 timeout=15.0,
@@ -203,18 +204,43 @@ def _fill_to_stream_fields(fill: dict, wallet: str) -> dict[str, bytes | str]:
         token_amount = Decimal(fill.get("makerAmountFilled", "0")) / scale
 
     price = (usdc_amount / token_amount) if token_amount > 0 else Decimal("0")
+    fee_usd = (Decimal(fill.get("fee", "0") or "0") / scale).quantize(Decimal("0.000001"))
+
+    def _as_hex66(dec_str: str) -> str:
+        """Convert decimal token id to 0x-prefixed 32-byte hex (len=66)."""
+        try:
+            n = int(str(dec_str or "0"))
+            if n < 0:
+                n = 0
+            return "0x" + format(n, "064x")
+        except Exception:
+            return "0x" + "0" * 64
+
+    raw_id = str(fill.get("id", "") or "")
+    # DB constraint: trades.id is VARCHAR(80). Subgraph ids can exceed this.
+    # We store a stable hash for the trade primary key.
+    trade_id = "fill_" + hashlib.sha256(raw_id.encode("utf-8")).hexdigest()
 
     return {
-        "id": fill.get("id", ""),
+        "id": trade_id,
         "tx_hash": fill.get("transactionHash", fill.get("id", "")),
         "wallet": wallet,
+        # keep both naming conventions for downstream compatibility
         "maker": maker,
         "taker": taker,
+        "maker_address": maker,
+        "taker_address": taker,
         "asset_id": asset_id,
+        # NOTE: orderbook subgraph doesn't expose condition_id directly here.
+        # As a fallback, we convert token id → fixed 32-byte hex so DB constraints work.
+        "market_id": _as_hex66(asset_id),
+        "outcome": "YES",
         "side": side,
         "price": str(price.quantize(Decimal("0.000001"))),
         "size_usd": str(usdc_amount.quantize(Decimal("0.01"))),
         "size_tokens": str(token_amount.quantize(Decimal("0.000001"))),
+        "size": str(token_amount.quantize(Decimal("0.000001"))),
+        "fee_usd": str(fee_usd),
         "timestamp": datetime.fromtimestamp(
             int(fill.get("timestamp", 0)), tz=timezone.utc
         ).isoformat(),

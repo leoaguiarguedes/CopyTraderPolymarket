@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  fetchWorkerLogs,
   fetchWorkersStatus,
   runDiscoverWallets,
   startWorkers,
@@ -13,6 +14,7 @@ export default function ControlPage() {
   const [loading, setLoading] = useState(false);
   const [workers, setWorkers] = useState<WorkerStatus[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [logs, setLogs] = useState<Record<string, string[]>>({});
 
   const [days, setDays] = useState(60);
   const [limit, setLimit] = useState(30);
@@ -30,9 +32,52 @@ export default function ControlPage() {
   }
 
   useEffect(() => {
-    refresh().catch((e) => setMsg(`Error: ${String(e)}`));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let alive = true;
+
+    async function tick() {
+      try {
+        await refresh();
+      } catch (e) {
+        if (alive) setMsg(`Error: ${String(e)}`);
+      }
+    }
+
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    async function pullLogs() {
+      const list = workers ?? [];
+      if (!list.length) return;
+      try {
+        const results = await Promise.all(
+          list.map((w) =>
+            fetchWorkerLogs(w.name as "collector" | "tracker" | "signal" | "execution", 80).catch(() => null)
+          )
+        );
+        const next: Record<string, string[]> = {};
+        for (const r of results) {
+          if (!r) continue;
+          next[r.name] = r.lines;
+        }
+        if (alive) setLogs(next);
+      } catch {
+        // ignore log pull errors (token, restart, etc)
+      }
+    }
+    pullLogs();
+    const id = window.setInterval(pullLogs, 1000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, [workers]);
 
   async function handleStart() {
     setLoading(true);
@@ -92,8 +137,8 @@ export default function ControlPage() {
           <div>
             <h2 className="text-sm font-semibold text-zinc-300 mb-1">Workers</h2>
             <p className="text-xs text-zinc-500">
-              Inicia/para workers como subprocessos dentro do container <code className="text-zinc-300">api</code>. Use{" "}
-              <code className="text-zinc-300">docker logs</code> para ver saída.
+              Inicia/para workers como subprocessos dentro do container <code className="text-zinc-300">api</code>. Logs
+              aparecem em tempo real abaixo.
             </p>
           </div>
           <div className="flex gap-3">
@@ -127,15 +172,29 @@ export default function ControlPage() {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-2">
+        <div className="mt-4 grid gap-3">
           {(workers ?? []).map((w) => (
-            <div key={w.name} className="flex items-center justify-between bg-zinc-950/40 border border-zinc-800 rounded-lg px-3 py-2">
-              <div className="flex items-center gap-3">
-                <span className={w.running ? "w-2 h-2 rounded-full bg-green-500" : "w-2 h-2 rounded-full bg-zinc-600"} />
-                <code className="text-zinc-200 text-xs">{w.name}</code>
+            <div key={w.name} className="bg-zinc-950/40 border border-zinc-800 rounded-lg px-3 py-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span
+                    className={
+                      w.running ? "w-2 h-2 rounded-full bg-green-500" : "w-2 h-2 rounded-full bg-zinc-600"
+                    }
+                  />
+                  <div className="flex flex-col">
+                    <code className="text-zinc-200 text-xs">{w.name}</code>
+                    <span className="text-[11px] text-zinc-500 font-mono">
+                      {w.running ? `pid=${w.pid ?? "?"}` : "stopped"}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="text-xs text-zinc-500 font-mono">
-                {w.running ? `pid=${w.pid ?? "?"}` : "stopped"}
+
+              <div className="mt-2 bg-zinc-950 border border-zinc-800 rounded p-2">
+                <pre className="whitespace-pre-wrap text-[11px] leading-4 text-zinc-300 min-h-[72px] max-h-[240px] overflow-auto">
+                  {(logs[w.name] ?? []).join("\n") || "(sem logs ainda)"}
+                </pre>
               </div>
             </div>
           ))}

@@ -9,6 +9,7 @@ Flow:
 from __future__ import annotations
 
 import asyncio
+import json
 import signal
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -52,18 +53,26 @@ def _load_tracked_addresses(path: str = "config/tracked_wallets.yaml") -> set[st
 def _deserialise_event(fields: dict[bytes, bytes]) -> TradeEvent | None:
     try:
         d = {k.decode(): v.decode() for k, v in fields.items()}
+        # Backward/forward compatible decoding:
+        # - collector publishes either the "trade event" shape (market_id/size/etc)
+        #   or the "fill" shape (asset_id/size_tokens/maker/taker).
+        market_id = d.get("market_id") or d.get("condition_id") or d.get("asset_id") or ""
+        size_tokens = d.get("size") or d.get("size_tokens") or "0"
+        maker = d.get("maker_address") or d.get("maker") or ""
+        taker = d.get("taker_address") or d.get("taker") or ""
+        outcome = d.get("outcome") or "YES"
         return TradeEvent(
             id=d["id"],
-            market_id=d["market_id"],
+            market_id=market_id,
             asset_id=d.get("asset_id", ""),
-            outcome=d.get("outcome", "YES"),
+            outcome=outcome,
             side=OrderSide(d.get("side", "BUY")),
             price=Decimal(d["price"]),
-            size=Decimal(d["size"]),
+            size=Decimal(size_tokens),
             size_usd=Decimal(d["size_usd"]),
             fee_usd=Decimal(d.get("fee_usd", "0")),
-            maker_address=d.get("maker_address", ""),
-            taker_address=d.get("taker_address", ""),
+            maker_address=maker,
+            taker_address=taker,
             timestamp=datetime.fromisoformat(d["timestamp"]),
             tx_hash=d.get("tx_hash", ""),
         )
@@ -182,9 +191,25 @@ async def run() -> None:
                         try:
                             await _persist_trade(event, wallet)
                             # forward to tracked_trades stream for Signal Engine
+                            payload = {
+                                "id": event.id,
+                                "market_id": event.market_id,
+                                "asset_id": event.asset_id,
+                                "outcome": event.outcome,
+                                "side": event.side.value,
+                                "price": str(event.price),
+                                "size": str(event.size),
+                                "size_usd": str(event.size_usd),
+                                "fee_usd": str(event.fee_usd),
+                                "maker_address": event.maker_address,
+                                "taker_address": event.taker_address,
+                                "timestamp": event.timestamp.isoformat(),
+                                "tx_hash": event.tx_hash,
+                                "tracked_wallet": wallet,
+                            }
                             await redis_client.xadd(
                                 TRACKED_STREAM,
-                                {**fields, b"tracked_wallet": wallet.encode()},
+                                {"data": json.dumps(payload)},
                                 maxlen=10_000,
                                 approximate=True,
                             )

@@ -1,5 +1,6 @@
 import { fetchSignals } from "@/lib/api";
 import { cn, fmtTime, fmtPct, shortAddr, fmtMinutes } from "@/lib/utils";
+import InfoTip from "@/components/InfoTip";
 
 export const dynamic = "force-dynamic";
 
@@ -32,17 +33,61 @@ export default async function SignalsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-zinc-500 text-xs uppercase tracking-wide bg-zinc-900 border-b border-zinc-800">
-              <th className="px-4 py-3 text-left">Hora</th>
-              <th className="px-4 py-3 text-left">Estratégia</th>
-              <th className="px-4 py-3 text-left">Mercado</th>
-              <th className="px-4 py-3 text-left">Lado</th>
-              <th className="px-4 py-3 text-right">Conf</th>
-              <th className="px-4 py-3 text-right">Entrada</th>
-              <th className="px-4 py-3 text-right">Tamanho%</th>
-              <th className="px-4 py-3 text-right">Máx. espera</th>
-              <th className="px-4 py-3 text-left">Origem</th>
-              <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3 text-left">Decisão</th>
+              <th className="px-4 py-3 text-left">
+                <span className="inline-flex items-center gap-1">
+                  Hora <InfoTip text="Timestamp de criação do sinal (UTC/local formatado)." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-left">
+                <span className="inline-flex items-center gap-1">
+                  Estratégia <InfoTip text="Nome da estratégia que gerou o sinal." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-left">
+                <span className="inline-flex items-center gap-1">
+                  Mercado <InfoTip text="Mercado/questão alvo do sinal (truncado)." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-left">
+                <span className="inline-flex items-center gap-1">
+                  Lado <InfoTip text="YES/NO (direção do trade sugerido)." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right">
+                <span className="inline-flex items-center gap-1 justify-end w-full">
+                  Conf <InfoTip text="Confiança do sinal (0–1)." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right">
+                <span className="inline-flex items-center gap-1 justify-end w-full">
+                  Entrada <InfoTip text="Preço de entrada sugerido pelo sinal." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right">
+                <span className="inline-flex items-center gap-1 justify-end w-full">
+                  Tamanho% <InfoTip text="Percentual do capital sugerido para a posição." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right">
+                <span className="inline-flex items-center gap-1 justify-end w-full">
+                  Máx. espera <InfoTip text="Holding máximo (minutos) antes de forçar saída." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-left">
+                <span className="inline-flex items-center gap-1">
+                  Origem <InfoTip text="Carteira que originou o sinal (copiada/observada)." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-left">
+                <span className="inline-flex items-center gap-1">
+                  Status <InfoTip text="Estado do sinal: aprovado/executado/rejeitado." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-left">
+                <span className="inline-flex items-center gap-1">
+                  Decisão <InfoTip text="Motivo/decisão do risk manager (ou razão do sinal)." />
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800 bg-zinc-950">

@@ -93,7 +93,8 @@ class SignalWorker:
         if event is None:
             return
 
-        wallet = event.taker_address.lower()
+        # Prefer the tracked wallet address (owner) when available.
+        wallet = (data.get("tracked_wallet") or event.taker_address or "").lower()
         score = await self._get_score(wallet)
 
         signals = self._engine.process_event(event, score)

@@ -49,12 +49,20 @@ async def test_workers_start_and_stop(monkeypatch):
 
     pid_seq = {"v": 100}
 
+    class FakeStdout:
+        def __init__(self) -> None:
+            self._lines = iter(["boot\n", "tick\n", ""])
+
+        def readline(self) -> str:
+            return next(self._lines)
+
     class FakePopen:
         def __init__(self, *_args, **_kwargs):
             pid_seq["v"] += 1
             self.pid = pid_seq["v"]
             self._returncode = None
             self.terminated = False
+            self.stdout = FakeStdout()
 
         def poll(self):
             return self._returncode
