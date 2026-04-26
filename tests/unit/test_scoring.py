@@ -16,9 +16,9 @@ def _make_trade(
     holding_min: float,
     wallet: str = "0xabc",
 ) -> WalletTrade:
-    opened = datetime(2025, 1, i + 1, tzinfo=timezone.utc)
     from datetime import timedelta
 
+    opened = datetime(2025, 1, 1, tzinfo=timezone.utc) + timedelta(days=i)
     closed = opened + timedelta(minutes=holding_min)
     return WalletTrade(
         trade_id=f"t{i}",
