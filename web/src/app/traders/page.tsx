@@ -14,8 +14,8 @@ export default async function TradersPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-zinc-100">Tracked Traders</h1>
-        <span className="text-xs text-zinc-500">{wallets.length} wallets</span>
+        <h1 className="text-lg font-bold text-zinc-100">Traders rastreados</h1>
+        <span className="text-xs text-zinc-500">{wallets.length} carteiras</span>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-zinc-800">
@@ -23,13 +23,13 @@ export default async function TradersPage() {
           <thead>
             <tr className="text-zinc-500 text-xs uppercase tracking-wide bg-zinc-900 border-b border-zinc-800">
               <th className="px-4 py-3 text-left">#</th>
-              <th className="px-4 py-3 text-left">Wallet</th>
-              <th className="px-4 py-3 text-right">Trades</th>
+              <th className="px-4 py-3 text-left">Carteira</th>
+              <th className="px-4 py-3 text-right">Negócios</th>
               <th className="px-4 py-3 text-right">Sharpe</th>
               <th className="px-4 py-3 text-right">ROI</th>
-              <th className="px-4 py-3 text-right">Win Rate</th>
-              <th className="px-4 py-3 text-right">Max DD</th>
-              <th className="px-4 py-3 text-right">Median Hold</th>
+              <th className="px-4 py-3 text-right">Taxa de acerto</th>
+              <th className="px-4 py-3 text-right">Máx. DD</th>
+              <th className="px-4 py-3 text-right">Tempo médio</th>
               <th className="px-4 py-3 text-right">Volume</th>
               <th className="px-4 py-3 text-right">Status</th>
             </tr>
@@ -41,11 +41,11 @@ export default async function TradersPage() {
                   colSpan={10}
                   className="px-4 py-8 text-center text-zinc-500 italic"
                 >
-                  No wallets tracked yet. Run{" "}
+                  Nenhuma carteira rastreada ainda. Execute{" "}
                   <code className="text-zinc-400">
                     python scripts/discover_wallets.py
                   </code>{" "}
-                  first.
+                  primeiro.
                 </td>
               </tr>
             )}
@@ -113,7 +113,7 @@ export default async function TradersPage() {
                         : "bg-zinc-800 text-zinc-500"
                     )}
                   >
-                    {w.is_active ? "active" : "tracked"}
+                    {w.is_active ? "ativo" : "rastreado"}
                   </span>
                 </td>
               </tr>

@@ -16,8 +16,8 @@ export default function SettingsPage() {
       const r = await toggleKillSwitch(active);
       setKsMsg(
         r.kill_switch
-          ? "Kill switch ACTIVATED — all trading halted."
-          : "Kill switch deactivated — trading resumed."
+          ? "Kill switch ATIVADO — todas as negociações interrompidas."
+          : "Kill switch desativado — negociações retomadas."
       );
     } catch (e) {
       setKsMsg(`Error: ${e}`);
@@ -28,7 +28,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
-      <h1 className="text-lg font-bold text-zinc-100">Settings</h1>
+      <h1 className="text-lg font-bold text-zinc-100">Configurações</h1>
 
       {/* Kill switch */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
@@ -36,9 +36,9 @@ export default function SettingsPage() {
           Kill Switch
         </h2>
         <p className="text-xs text-zinc-500 mb-4">
-          Immediately halt all signal execution and prevent new positions from
-          being opened. Existing positions continue to be monitored for
-          TP/SL/timeout exits.
+          Interrompe imediatamente toda execução de sinais e impede que novas
+          posições sejam abertas. Posições existentes continuam sendo monitoradas
+          para TP/SL/saídas por tempo.
         </p>
         <div className="flex gap-3">
           <button
@@ -46,14 +46,14 @@ export default function SettingsPage() {
             disabled={ksLoading}
             className="px-4 py-2 rounded bg-red-700 hover:bg-red-600 text-white text-sm font-medium transition disabled:opacity-50"
           >
-            {ksLoading ? "…" : "Activate Kill Switch"}
+            {ksLoading ? "…" : "Ativar Kill Switch"}
           </button>
           <button
             onClick={() => handleKillSwitch(false)}
             disabled={ksLoading}
             className="px-4 py-2 rounded bg-green-700 hover:bg-green-600 text-white text-sm font-medium transition disabled:opacity-50"
           >
-            {ksLoading ? "…" : "Deactivate"}
+            {ksLoading ? "…" : "Desativar"}
           </button>
         </div>
         {ksMsg && (
@@ -66,45 +66,45 @@ export default function SettingsPage() {
       {/* API info */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
         <h2 className="text-sm font-semibold text-zinc-300 mb-3">
-          Backend API
+          API Backend
         </h2>
         <div className="flex flex-col gap-2 text-xs font-mono">
           <Row label="URL" value={API_URL} />
           <Row label="Docs" value={`${API_URL}/docs`} link />
-          <Row label="Metrics" value={`${API_URL}/metrics`} link />
-          <Row label="Health" value={`${API_URL}/health`} link />
+          <Row label="Métricas" value={`${API_URL}/metrics`} link />
+          <Row label="Saúde" value={`${API_URL}/health`} link />
         </div>
       </div>
 
       {/* Config files */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
         <h2 className="text-sm font-semibold text-zinc-300 mb-3">
-          Configuration Files
+          Arquivos de configuração
         </h2>
         <div className="text-xs text-zinc-500 flex flex-col gap-2">
           <p>
-            Edit these files and restart the relevant worker to apply changes:
+            Edite estes arquivos e reinicie o worker relevante para aplicar as alterações:
           </p>
           <ul className="list-disc list-inside gap-1 flex flex-col">
             <li>
               <code className="text-zinc-300">config/strategies.yaml</code> —
-              strategy parameters (thresholds, sizes, weights)
+              parâmetros de estratégia (limiares, tamanhos, pesos)
             </li>
             <li>
               <code className="text-zinc-300">config/tracked_wallets.yaml</code>{" "}
-              — list of monitored wallets
+              — lista de carteiras monitoradas
             </li>
             <li>
-              <code className="text-zinc-300">.env</code> — secrets and
-              environment variables
+              <code className="text-zinc-300">.env</code> — segredos e
+              variáveis de ambiente
             </li>
           </ul>
           <p className="mt-2">
-            Run{" "}
+            Execute{" "}
             <code className="text-zinc-300">
               python scripts/discover_wallets.py
             </code>{" "}
-            to refresh the tracked wallets list.
+            para atualizar a lista de carteiras rastreadas.
           </p>
         </div>
       </div>
@@ -125,7 +125,7 @@ export default function SettingsPage() {
             </div>
           ))}
           <p className="mt-2">
-            Start workers with:{" "}
+            Inicie os workers com:{" "}
             <code className="text-zinc-300">
               docker compose up execution_worker signal_worker tracker_worker
               collector_worker

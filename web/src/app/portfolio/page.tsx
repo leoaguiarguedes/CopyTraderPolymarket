@@ -14,24 +14,24 @@ export default async function PortfolioPage() {
       {/* ── Open Positions ───────────────────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-bold text-zinc-100">Open Positions</h1>
-          <span className="text-xs text-zinc-500">{open.length} open</span>
+          <h1 className="text-lg font-bold text-zinc-100">Posições abertas</h1>
+          <span className="text-xs text-zinc-500">{open.length} abertas</span>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-zinc-800">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-zinc-500 text-xs uppercase tracking-wide bg-zinc-900 border-b border-zinc-800">
-                <th className="px-4 py-3 text-left">Market</th>
-                <th className="px-4 py-3 text-left">Strategy</th>
-                <th className="px-4 py-3 text-left">Side</th>
-                <th className="px-4 py-3 text-right">Entry</th>
-                <th className="px-4 py-3 text-right">Size</th>
+                <th className="px-4 py-3 text-left">Mercado</th>
+                <th className="px-4 py-3 text-left">Estratégia</th>
+                <th className="px-4 py-3 text-left">Lado</th>
+                <th className="px-4 py-3 text-right">Entrada</th>
+                <th className="px-4 py-3 text-right">Tamanho</th>
                 <th className="px-4 py-3 text-right">TP</th>
                 <th className="px-4 py-3 text-right">SL</th>
-                <th className="px-4 py-3 text-right">Age</th>
-                <th className="px-4 py-3 text-right">Exit In</th>
-                <th className="px-4 py-3 text-left">Opened</th>
+                <th className="px-4 py-3 text-right">Idade</th>
+                <th className="px-4 py-3 text-right">Saída em</th>
+                <th className="px-4 py-3 text-left">Aberta em</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800 bg-zinc-950">
@@ -41,7 +41,7 @@ export default async function PortfolioPage() {
                     colSpan={10}
                     className="px-4 py-8 text-center text-zinc-500 italic"
                   >
-                    No open positions
+                    Nenhuma posição aberta
                   </td>
                 </tr>
               )}
@@ -117,9 +117,9 @@ export default async function PortfolioPage() {
       {/* ── Closed Positions ─────────────────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-bold text-zinc-100">Closed Positions</h1>
+          <h1 className="text-lg font-bold text-zinc-100">Posições fechadas</h1>
           <span className="text-xs text-zinc-500">
-            {closed.length} shown (last 100)
+            {closed.length} exibidas (últimas 100)
           </span>
         </div>
 
@@ -127,15 +127,15 @@ export default async function PortfolioPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-zinc-500 text-xs uppercase tracking-wide bg-zinc-900 border-b border-zinc-800">
-                <th className="px-4 py-3 text-left">Market</th>
-                <th className="px-4 py-3 text-left">Strategy</th>
-                <th className="px-4 py-3 text-left">Side</th>
-                <th className="px-4 py-3 text-right">Entry</th>
-                <th className="px-4 py-3 text-right">Exit</th>
-                <th className="px-4 py-3 text-right">Size</th>
-                <th className="px-4 py-3 text-right">PnL</th>
-                <th className="px-4 py-3 text-left">Reason</th>
-                <th className="px-4 py-3 text-left">Closed</th>
+                <th className="px-4 py-3 text-left">Mercado</th>
+                <th className="px-4 py-3 text-left">Estratégia</th>
+                <th className="px-4 py-3 text-left">Lado</th>
+                <th className="px-4 py-3 text-right">Entrada</th>
+                <th className="px-4 py-3 text-right">Saída</th>
+                <th className="px-4 py-3 text-right">Tamanho</th>
+                <th className="px-4 py-3 text-right">P/L</th>
+                <th className="px-4 py-3 text-left">Motivo</th>
+                <th className="px-4 py-3 text-left">Fechada em</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800 bg-zinc-950">
@@ -145,7 +145,7 @@ export default async function PortfolioPage() {
                     colSpan={9}
                     className="px-4 py-8 text-center text-zinc-500 italic"
                   >
-                    No closed positions yet
+                    Ainda não há posições fechadas
                   </td>
                 </tr>
               )}

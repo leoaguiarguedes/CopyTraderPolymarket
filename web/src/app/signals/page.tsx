@@ -8,17 +8,22 @@ export default async function SignalsPage() {
 
   const approved = signals.filter((s) => s.status === "approved" || s.status === "executed");
   const rejected = signals.filter((s) => s.status === "rejected");
+  const statusMap = {
+    approved: "aprovado",
+    executed: "executado",
+    rejected: "rejeitado",
+  } as const;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-zinc-100">Signal Feed</h1>
+        <h1 className="text-lg font-bold text-zinc-100">Feed de sinais</h1>
         <div className="flex gap-3 text-xs text-zinc-500">
           <span className="text-green-400 font-semibold">
-            {approved.length} approved
+            {approved.length} aprovados
           </span>
           <span className="text-red-400 font-semibold">
-            {rejected.length} rejected
+            {rejected.length} rejeitados
           </span>
         </div>
       </div>
@@ -27,17 +32,17 @@ export default async function SignalsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-zinc-500 text-xs uppercase tracking-wide bg-zinc-900 border-b border-zinc-800">
-              <th className="px-4 py-3 text-left">Time</th>
-              <th className="px-4 py-3 text-left">Strategy</th>
-              <th className="px-4 py-3 text-left">Market</th>
-              <th className="px-4 py-3 text-left">Side</th>
+              <th className="px-4 py-3 text-left">Hora</th>
+              <th className="px-4 py-3 text-left">Estratégia</th>
+              <th className="px-4 py-3 text-left">Mercado</th>
+              <th className="px-4 py-3 text-left">Lado</th>
               <th className="px-4 py-3 text-right">Conf</th>
-              <th className="px-4 py-3 text-right">Entry</th>
-              <th className="px-4 py-3 text-right">Size%</th>
-              <th className="px-4 py-3 text-right">Max Hold</th>
-              <th className="px-4 py-3 text-left">Source</th>
+              <th className="px-4 py-3 text-right">Entrada</th>
+              <th className="px-4 py-3 text-right">Tamanho%</th>
+              <th className="px-4 py-3 text-right">Máx. espera</th>
+              <th className="px-4 py-3 text-left">Origem</th>
               <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3 text-left">Decision</th>
+              <th className="px-4 py-3 text-left">Decisão</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800 bg-zinc-950">
@@ -47,7 +52,7 @@ export default async function SignalsPage() {
                   colSpan={11}
                   className="px-4 py-8 text-center text-zinc-500 italic"
                 >
-                  No signals yet — run the signal worker to see data here.
+                  Ainda não há sinais — execute o worker de sinais para ver dados aqui.
                 </td>
               </tr>
             )}
@@ -125,7 +130,7 @@ export default async function SignalsPage() {
                         : "bg-red-900/40 text-red-400"
                     )}
                   >
-                    {s.status}
+                    {statusMap[s.status as keyof typeof statusMap] ?? s.status}
                   </span>
                 </td>
                 <td

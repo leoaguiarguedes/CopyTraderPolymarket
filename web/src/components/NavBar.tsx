@@ -4,12 +4,12 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const links = [
-  { href: "/", label: "Dashboard" },
+  { href: "/", label: "Painel" },
   { href: "/traders", label: "Traders" },
-  { href: "/portfolio", label: "Portfolio" },
-  { href: "/signals", label: "Signals" },
+  { href: "/portfolio", label: "Carteira" },
+  { href: "/signals", label: "Sinais" },
   { href: "/backtest", label: "Backtest" },
-  { href: "/settings", label: "Settings" },
+  { href: "/settings", label: "Configurações" },
 ];
 
 export default function NavBar() {

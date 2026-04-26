@@ -17,14 +17,14 @@ export default async function BacktestPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-bold text-zinc-100">Backtest / Performance</h1>
+      <h1 className="text-lg font-bold text-zinc-100">Backtest / Desempenho</h1>
 
-      {/* Comparison table */}
+      {/* Tabela de comparação */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: "Last 7 days", s: summary7d },
-          { label: "Last 30 days", s: summary30d },
-          { label: "All time", s: summaryAll },
+          { label: "Últimos 7 dias", s: summary7d },
+          { label: "Últimos 30 dias", s: summary30d },
+          { label: "Todo o período", s: summaryAll },
         ].map(({ label, s }) => (
           <div
             key={label}
@@ -35,7 +35,7 @@ export default async function BacktestPage() {
             </h2>
             <div className="grid grid-cols-2 gap-2">
               <StatCard
-                label="PnL"
+                label="P/L"
                 value={fmtUsd(s.total_pnl_usd)}
                 positive={s.total_pnl_usd >= 0}
                 negative={s.total_pnl_usd < 0}
@@ -47,9 +47,9 @@ export default async function BacktestPage() {
                 negative={s.roi < 0}
               />
               <StatCard
-                label="Win Rate"
+                label="Taxa de acerto"
                 value={fmtPct(s.win_rate)}
-                sub={`${s.n_closed_positions} trades`}
+                sub={`${s.n_closed_positions} negócios`}
               />
               <StatCard
                 label="Volume"
@@ -63,13 +63,13 @@ export default async function BacktestPage() {
       {/* 30d equity curve */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
         <h2 className="text-sm font-semibold text-zinc-300 mb-3">
-          30-day Equity Curve (6h buckets)
+          Curva de patrimônio de 30 dias (intervalos de 6h)
         </h2>
         {curve30d.points.length > 0 ? (
           <EquityCurveChart data={curve30d} />
         ) : (
           <p className="text-zinc-500 text-sm italic py-8 text-center">
-            No closed positions in the last 30 days.
+            Nenhuma posição fechada nos últimos 30 dias.
           </p>
         )}
       </div>
@@ -77,13 +77,13 @@ export default async function BacktestPage() {
       {/* 7d equity curve */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
         <h2 className="text-sm font-semibold text-zinc-300 mb-3">
-          7-day Equity Curve (1h buckets)
+          Curva de patrimônio de 7 dias (intervalos de 1h)
         </h2>
         {curve7d.points.length > 0 ? (
           <EquityCurveChart data={curve7d} />
         ) : (
           <p className="text-zinc-500 text-sm italic py-8 text-center">
-            No closed positions in the last 7 days.
+            Nenhuma posição fechada nos últimos 7 dias.
           </p>
         )}
       </div>
@@ -91,11 +91,11 @@ export default async function BacktestPage() {
       {/* Future: run backtest form */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
         <h2 className="text-sm font-semibold text-zinc-300 mb-2">
-          Historical Backtest (Phase 3)
+          Backtest histórico (Fase 3)
         </h2>
         <p className="text-zinc-500 text-sm">
-          Full event-replay backtest engine coming in Phase 3. The metrics above
-          reflect live paper-trading performance.
+          Motor de backtest com replay de eventos será lançado na Fase 3. As métricas acima
+          refletem desempenho de paper trading ao vivo.
         </p>
       </div>
     </div>

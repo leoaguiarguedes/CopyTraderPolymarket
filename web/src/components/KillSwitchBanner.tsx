@@ -25,13 +25,13 @@ export default function KillSwitchBanner() {
   if (!active) {
     return (
       <div className="flex items-center justify-end gap-2 px-4 py-1">
-        <span className="text-xs text-green-400">● Bot running</span>
+        <span className="text-xs text-green-400">● Bot em execução</span>
         <button
           onClick={toggle}
           disabled={loading}
           className="text-xs px-2 py-0.5 rounded bg-red-800/60 hover:bg-red-700 text-red-200 transition"
         >
-          Kill
+          Parar
         </button>
       </div>
     );
@@ -39,13 +39,13 @@ export default function KillSwitchBanner() {
 
   return (
     <div className="flex items-center justify-between bg-red-900/80 border-b border-red-500 px-4 py-2 text-red-100">
-      <span className="font-semibold text-sm">⛔ KILL SWITCH ACTIVE — all trading halted</span>
+      <span className="font-semibold text-sm">⛔ KILL SWITCH ATIVADO — todas as negociações interrompidas</span>
       <button
         onClick={toggle}
         disabled={loading}
         className="text-xs px-3 py-1 rounded bg-green-700 hover:bg-green-600 text-white transition"
       >
-        {loading ? "…" : "Resume"}
+        {loading ? "…" : "Retomar"}
       </button>
     </div>
   );

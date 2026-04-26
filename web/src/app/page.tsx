@@ -20,9 +20,9 @@ async function DashboardContent() {
       {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard
-          label="Total PnL"
+          label="P/L Total"
           value={fmtUsd(summary.total_pnl_usd)}
-          sub="All time, closed"
+          sub="Todo o período, fechado"
           positive={pnlPositive}
           negative={!pnlPositive}
         />
@@ -33,22 +33,22 @@ async function DashboardContent() {
           negative={summary.roi < 0}
         />
         <StatCard
-          label="Win Rate"
+          label="Taxa de acerto"
           value={fmtPct(summary.win_rate)}
-          sub={`${summary.n_closed_positions} closed trades`}
+          sub={`${summary.n_closed_positions} negócios fechados`}
         />
         <StatCard
-          label="Open Positions"
+          label="Posições abertas"
           value={String(summary.open_positions)}
-          sub={fmtUsd(summary.open_exposure_usd) + " exposure"}
+          sub={fmtUsd(summary.open_exposure_usd) + " em exposição"}
         />
         <StatCard
           label="Volume"
           value={fmtUsd(summary.total_volume_usd)}
-          sub="Closed positions"
+          sub="Posições fechadas"
         />
         <StatCard
-          label="Closed Trades"
+          label="Negócios fechados"
           value={String(summary.n_closed_positions)}
         />
       </div>
@@ -57,7 +57,7 @@ async function DashboardContent() {
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-zinc-300">
-            Equity Curve (30d)
+            Curva de patrimônio (30 dias)
           </h2>
           <span
             className={
@@ -74,7 +74,7 @@ async function DashboardContent() {
           <EquityCurveChart data={curve} />
         ) : (
           <p className="text-zinc-500 text-sm italic py-8 text-center">
-            No closed positions yet — run the bot to see data here.
+            Ainda não há posições fechadas — execute o bot para ver dados aqui.
           </p>
         )}
       </div>
@@ -82,7 +82,7 @@ async function DashboardContent() {
       {/* Live feed */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
         <h2 className="text-sm font-semibold text-zinc-300 mb-3">
-          Live Position Feed
+          Feed de posições ao vivo
         </h2>
         <SignalFeed />
       </div>
@@ -94,7 +94,7 @@ export default function DashboardPage() {
   return (
     <Suspense
       fallback={
-        <div className="text-zinc-500 text-sm italic">Loading dashboard…</div>
+        <div className="text-zinc-500 text-sm italic">Carregando painel…</div>
       }
     >
       <DashboardContent />

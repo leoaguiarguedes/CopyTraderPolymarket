@@ -5,14 +5,14 @@ import KillSwitchBanner from "@/components/KillSwitchBanner";
 
 export const metadata: Metadata = {
   title: "CopyTrader Polymarket",
-  description: "Automated copytrading dashboard for Polymarket",
+  description: "Painel de copytrading automatizado para Polymarket",
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="pt-BR" className="dark">
       <body className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
         <KillSwitchBanner />
         <NavBar />
