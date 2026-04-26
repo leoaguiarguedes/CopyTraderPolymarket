@@ -173,3 +173,28 @@ class Position(Base):
         Index("ix_positions_opened_at", "opened_at"),
         Index("ix_positions_market_open", "market_id", "closed_at"),
     )
+
+
+class BacktestRun(Base):
+    __tablename__ = "backtest_runs"
+
+    run_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    strategy: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    start_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    wallets_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    params_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
+    n_trades: Mapped[int | None] = mapped_column(nullable=True)
+    total_pnl_usd: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    roi: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
+    sharpe: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
+    max_drawdown: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
+    win_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
+    pct_timeout_exits: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
+    metrics_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False, index=True
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

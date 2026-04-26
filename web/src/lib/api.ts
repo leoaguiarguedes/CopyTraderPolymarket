@@ -218,3 +218,187 @@ export async function fetchWorkerLogs(name: "collector" | "tracker" | "signal" |
     lines: string[];
   }>("/control/workers/logs", { name, tail });
 }
+
+// ── Backtest ──────────────────────────────────────────────────────────────────
+
+export type BacktestRunSummary = {
+  run_id: string;
+  strategy: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  n_wallets: number;
+  n_trades: number | null;
+  total_pnl_usd: number | null;
+  roi: number | null;
+  sharpe: number | null;
+  win_rate: number | null;
+  max_drawdown: number | null;
+  pct_timeout_exits: number | null;
+  error: string;
+  created_at: string;
+  finished_at: string | null;
+};
+
+export type BacktestMetrics = {
+  n_trades: number;
+  n_wins: number;
+  n_losses: number;
+  win_rate: number;
+  total_pnl_usd: number;
+  roi: number;
+  avg_pnl_usd: number;
+  avg_win_usd: number;
+  avg_loss_usd: number;
+  profit_factor: number;
+  expectancy_usd: number;
+  sharpe: number;
+  max_drawdown: number;
+  avg_holding_minutes: number;
+  median_holding_minutes: number;
+  pct_tp_exits: number;
+  pct_sl_exits: number;
+  pct_timeout_exits: number;
+  equity_curve: number[];
+};
+
+export type BacktestRunRequest = {
+  strategy: string;
+  start_date: string;
+  end_date: string;
+  wallets?: string[];
+  params?: Record<string, unknown>;
+  capital_usd?: number;
+};
+
+export function fetchBacktestRuns(limit = 20, strategy?: string) {
+  return get<BacktestRunSummary[]>("/backtest/runs", { limit, strategy });
+}
+
+export function fetchBacktestRun(run_id: string) {
+  return get<BacktestRunSummary>(`/backtest/runs/${run_id}`);
+}
+
+export function fetchBacktestMetrics(run_id: string) {
+  return get<BacktestMetrics | { error: string }>(`/backtest/runs/${run_id}/metrics`);
+}
+
+export function startBacktest(req: BacktestRunRequest) {
+  return post<{ run_id: string; status: string }>("/backtest/run", req);
+}
+
+export function deleteBacktestRun(run_id: string) {
+  const url = new URL(`/backtest/runs/${run_id}`, BASE);
+  return fetch(url.toString(), { method: "DELETE" });
+}
+
+export const BACKTEST_REPORT_URL = (run_id: string) =>
+  `${BASE}/backtest/runs/${run_id}/report`;
+
+export const BACKTEST_CSV_URL = (run_id: string) =>
+  `${BASE}/backtest/runs/${run_id}/csv`;
+
+// ── Grid Search ───────────────────────────────────────────────────────────────
+
+export type GridConfig = {
+  params: Record<string, unknown>;
+  n_trades: number;
+  sharpe: number;
+  roi: number;
+  win_rate: number;
+  total_pnl_usd: number;
+  max_drawdown: number;
+  profit_factor: number;
+  pct_timeout_exits: number;
+};
+
+export type GridSearchResult = {
+  run_id: string;
+  strategy: string;
+  start_date: string;
+  end_date: string;
+  param_grid: Record<string, unknown[]>;
+  total_combinations: number;
+  completed: number;
+  status: string;
+  error: string;
+  finished_at: string | null;
+  top_configs: GridConfig[];
+};
+
+export type GridSearchRequest = {
+  strategy: string;
+  start_date: string;
+  end_date: string;
+  wallets?: string[];
+  param_grid: Record<string, unknown[]>;
+  capital_usd?: number;
+  top_n?: number;
+};
+
+export function startGridSearch(req: GridSearchRequest) {
+  return post<{ run_id: string; status: string }>("/backtest/grid-search", req);
+}
+
+export function fetchGridSearch(run_id: string) {
+  return get<GridSearchResult>(`/backtest/grid-search/${run_id}`);
+}
+
+// ── Walk-Forward ──────────────────────────────────────────────────────────────
+
+export type WalkForwardMetrics = {
+  n_trades: number;
+  win_rate: number;
+  total_pnl_usd: number;
+  roi: number;
+  sharpe: number;
+  max_drawdown: number;
+  profit_factor: number;
+  expectancy_usd: number;
+  avg_holding_minutes: number;
+  pct_tp_exits: number;
+  pct_sl_exits: number;
+  pct_timeout_exits: number;
+  equity_curve: number[];
+} | null;
+
+export type WalkForwardResult = {
+  run_id: string;
+  strategy: string;
+  full_start: string;
+  full_end: string;
+  split_date: string;
+  in_start: string;
+  in_end: string;
+  out_start: string;
+  out_end: string;
+  params: Record<string, unknown>;
+  status: string;
+  error: string;
+  finished_at: string | null;
+  overfit_flag: boolean;
+  divergence: number;
+  in_signals: number;
+  out_signals: number;
+  in_positions: number;
+  out_positions: number;
+  in_sample: WalkForwardMetrics;
+  out_sample: WalkForwardMetrics;
+};
+
+export type WalkForwardRequest = {
+  strategy: string;
+  start_date: string;
+  end_date: string;
+  wallets?: string[];
+  params?: Record<string, unknown>;
+  capital_usd?: number;
+};
+
+export function startWalkForward(req: WalkForwardRequest) {
+  return post<{ run_id: string; status: string }>("/backtest/walk-forward", req);
+}
+
+export function fetchWalkForward(run_id: string) {
+  return get<WalkForwardResult>(`/backtest/walk-forward/${run_id}`);
+}
