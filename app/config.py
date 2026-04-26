@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     admin_user: str = "admin"
     admin_pass: SecretStr = SecretStr("changeme")
 
+    # ── Operational control (optional) ────────────────────────────
+    # If set, `app/api/routes/control.py` requires `X-Control-Token`.
+    control_token: SecretStr | None = None
+
     # ── Alerting (optional) ───────────────────────────────────────
     discord_webhook_url: str | None = None
     telegram_bot_token: SecretStr | None = None

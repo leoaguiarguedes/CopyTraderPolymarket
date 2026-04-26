@@ -9,6 +9,7 @@ const links = [
   { href: "/portfolio", label: "Carteira" },
   { href: "/signals", label: "Sinais" },
   { href: "/backtest", label: "Backtest" },
+  { href: "/control", label: "Control" },
   { href: "/settings", label: "Configurações" },
 ];
 

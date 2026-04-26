@@ -171,3 +171,37 @@ export function toggleKillSwitch(active: boolean) {
 export function fetchHealth() {
   return get<{ status: string }>("/health");
 }
+
+// ── Control ───────────────────────────────────────────────────────────────────
+
+export type WorkerStatus = {
+  name: string;
+  running: boolean;
+  pid: number | null;
+  cmd: string[];
+};
+
+export async function fetchWorkersStatus() {
+  return get<WorkerStatus[]>("/control/workers");
+}
+
+export async function startWorkers(which?: Array<"collector" | "tracker" | "signal" | "execution">) {
+  const qs = which?.length ? `?${which.map((w) => `which=${encodeURIComponent(w)}`).join("&")}` : "";
+  return post<{ started: WorkerStatus[]; already_running: WorkerStatus[] }>(
+    `/control/workers/start${qs}`
+  );
+}
+
+export async function stopWorkers(which?: Array<"collector" | "tracker" | "signal" | "execution">) {
+  const qs = which?.length ? `?${which.map((w) => `which=${encodeURIComponent(w)}`).join("&")}` : "";
+  return post<WorkerStatus[]>(`/control/workers/stop${qs}`);
+}
+
+export async function runDiscoverWallets(days: number, limit: number, source: "orderbook" | "pnl" = "orderbook") {
+  return post<{
+    command: string;
+    exit_code: number;
+    stdout: string;
+    stderr: string;
+  }>(`/control/discover-wallets?days=${days}&limit=${limit}&source=${source}`);
+}
