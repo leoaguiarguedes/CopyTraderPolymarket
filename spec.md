@@ -1,512 +1,320 @@
-SPEC TÉCNICO — CopyTrader Polymarket (Python)
+# SPEC TÉCNICO — CopyTrader Polymarket (Python)
 
-1\. 🧠 Visão Geral da Arquitetura
-
-
+## 1. 🧠 Visão Geral da Arquitetura
 
 Arquitetura orientada a eventos (quase real-time):
 
+- Data Collector → Wallet Tracker → Signal Engine → Execution Engine
+  - ↓
+  - Risk Manager
+    - ↓
+    - Database
+      - ↓
+      - Dashboard/API
 
+## 2. 📦 Estrutura do Projeto
 
-\[Data Collector] → \[Wallet Tracker] → \[Signal Engine] → \[Execution Engine]
-
-&#x20;                             ↓
-
-&#x20;                       \[Risk Manager]
-
-&#x20;                             ↓
-
-&#x20;                        \[Database]
-
-&#x20;                             ↓
-
-&#x20;                        \[Dashboard/API]
-
-2\. 📦 Estrutura do Projeto
-
+```text
 polymarket-bot/
-
-│
-
 ├── app/
-
 │   ├── main.py
-
 │   ├── config.py
-
-│
-
 │   ├── data/
-
-│   │   ├── polymarket\_client.py
-
+│   │   ├── polymarket_client.py
 │   │   ├── scraper.py
-
-│
-
 │   ├── tracker/
-
-│   │   ├── wallet\_tracker.py
-
-│
-
+│   │   ├── wallet_tracker.py
 │   ├── signals/
-
-│   │   ├── signal\_engine.py
-
+│   │   ├── signal_engine.py
 │   │   ├── strategies.py
-
-│
-
 │   ├── execution/
-
 │   │   ├── executor.py
-
-│   │   ├── order\_manager.py
-
-│
-
+│   │   ├── order_manager.py
 │   ├── risk/
-
-│   │   ├── risk\_manager.py
-
-│
-
+│   │   ├── risk_manager.py
 │   ├── storage/
-
 │   │   ├── db.py
-
 │   │   ├── models.py
-
-│
-
 │   ├── utils/
-
 │   │   ├── logger.py
-
 │   │   ├── time.py
-
-│
-
 ├── workers/
-
-│   ├── tracker\_worker.py
-
-│   ├── signal\_worker.py
-
-│   ├── execution\_worker.py
-
-│
-
+│   ├── tracker_worker.py
+│   ├── signal_worker.py
+│   ├── execution_worker.py
 ├── docker-compose.yml
-
 ├── requirements.txt
-
 └── README.md
+```
 
-3\. ⚙️ Stack Técnico
+## 3. ⚙️ Stack Técnico
 
-Python 3.11+
+- Python 3.11+
+- FastAPI → API + dashboard
+- PostgreSQL → persistência
+- Redis → fila/cache
+- Web3.py → interação com Polygon (Polymarket)
+- asyncio → concorrência leve
+- SQLAlchemy → ORM
 
-FastAPI → API + dashboard
+## 4. 📡 Data Layer
 
-PostgreSQL → persistência
-
-Redis → fila/cache
-
-Web3.py → interação com Polygon (Polymarket)
-
-asyncio → concorrência leve
-
-SQLAlchemy → ORM
-
-4\. 📡 Data Layer
-
-4.1 polymarket\_client.py
-
-
+### `polymarket_client.py`
 
 Responsável por:
 
+- buscar mercados
+- buscar trades recentes
+- buscar histórico de wallet
 
-
-Buscar mercados
-
-Buscar trades recentes
-
-Buscar histórico de wallet
-
+```python
 class PolymarketClient:
+    async def get_recent_trades(self) -> list:
+        ...
 
-&#x20;   async def get\_recent\_trades(self) -> list:
+    async def get_wallet_trades(self, wallet: str) -> list:
+        ...
 
-&#x20;       ...
+    async def get_markets(self) -> list:
+        ...
+```
 
+**Fonte:** API pública / subgraph (The Graph)
 
+## 5. 👀 Wallet Tracker
 
-&#x20;   async def get\_wallet\_trades(self, wallet: str) -> list:
-
-&#x20;       ...
-
-
-
-&#x20;   async def get\_markets(self) -> list:
-
-&#x20;       ...
-
-
-
-📌 Fonte:
-
-
-
-API pública / subgraph (The Graph)
-
-5\. 👀 Wallet Tracker
-
-wallet\_tracker.py
-
-
+### `wallet_tracker.py`
 
 Responsável por:
 
+- monitorar wallets top
+- detectar novos trades relevantes
 
-
-Monitorar wallets top
-
-Detectar novos trades relevantes
-
+```python
 class WalletTracker:
+    def __init__(self, client):
+        self.client = client
+        self.tracked_wallets = []
 
-&#x20;   def \_\_init\_\_(self, client):
+    async def track(self):
+        trades = await self.client.get_recent_trades()
 
-&#x20;       self.client = client
+        for trade in trades:
+            if trade.wallet in self.tracked_wallets:
+                yield trade
+```
 
-&#x20;       self.tracked\_wallets = \[]
+## 6. 🧠 Signal Engine
 
+### `signal_engine.py`
 
+Transforma trades em sinais.
 
-&#x20;   async def track(self):
-
-&#x20;       trades = await self.client.get\_recent\_trades()
-
-
-
-&#x20;       for trade in trades:
-
-&#x20;           if trade.wallet in self.tracked\_wallets:
-
-&#x20;               yield trade
-
-6\. 🧠 Signal Engine
-
-signal\_engine.py
-
-
-
-Transforma trades em sinais
-
-
-
+```python
 class Signal:
+    def __init__(self, market_id, side, confidence, size):
+        self.market_id = market_id
+        self.side = side
+        self.confidence = confidence
+        self.size = size
+```
 
-&#x20;   def \_\_init\_\_(self, market\_id, side, confidence, size):
+### `strategies.py`
 
-&#x20;       self.market\_id = market\_id
+#### Estratégia 1 — Whale Copy
 
-&#x20;       self.side = side
+```python
+def whale_copy_strategy(trade):
+    if trade.size_usd > 1000:
+        return Signal(
+            market_id=trade.market_id,
+            side=trade.side,
+            confidence=0.7,
+            size=0.02  # 2% do capital
+        )
+```
 
-&#x20;       self.confidence = confidence
+#### Estratégia 2 — Consensus
 
-&#x20;       self.size = size
+```python
+def consensus_strategy(trades):
+    grouped = group_by_market(trades)
 
-strategies.py
+    for market, t in grouped.items():
+        if len(t) >= 2:
+            yield Signal(...)
+```
 
-Estratégia 1 — Whale Copy
+## 7. 💸 Execution Engine
 
-def whale\_copy\_strategy(trade):
+### `executor.py`
 
-&#x20;   if trade.size\_usd > 1000:
-
-&#x20;       return Signal(
-
-&#x20;           market\_id=trade.market\_id,
-
-&#x20;           side=trade.side,
-
-&#x20;           confidence=0.7,
-
-&#x20;           size=0.02  # 2% do capital
-
-&#x20;       )
-
-Estratégia 2 — Consensus
-
-def consensus\_strategy(trades):
-
-&#x20;   grouped = group\_by\_market(trades)
-
-
-
-&#x20;   for market, t in grouped.items():
-
-&#x20;       if len(t) >= 2:
-
-&#x20;           yield Signal(...)
-
-7\. 💸 Execution Engine
-
-executor.py
-
+```python
 class Executor:
+    def __init__(self, web3, wallet):
+        self.web3 = web3
+        self.wallet = wallet
 
-&#x20;   def \_\_init\_\_(self, web3, wallet):
+    async def execute(self, signal):
+        if signal.side == "YES":
+            await self.buy(signal)
+        else:
+            await self.sell(signal)
 
-&#x20;       self.web3 = web3
+    async def buy(self, signal):
+        ...
 
-&#x20;       self.wallet = wallet
+    async def sell(self, signal):
+        ...
+```
 
+## 8. 🛡️ Risk Manager
 
+### `risk_manager.py`
 
-&#x20;   async def execute(self, signal):
-
-&#x20;       if signal.side == "YES":
-
-&#x20;           await self.buy(signal)
-
-&#x20;       else:
-
-&#x20;           await self.sell(signal)
-
-
-
-&#x20;   async def buy(self, signal):
-
-&#x20;       ...
-
-
-
-&#x20;   async def sell(self, signal):
-
-&#x20;       ...
-
-8\. 🛡️ Risk Manager
-
-risk\_manager.py
-
+```python
 class RiskManager:
+    def __init__(self, capital):
+        self.capital = capital
 
-&#x20;   def \_\_init\_\_(self, capital):
+    def validate(self, signal):
+        if signal.size > 0.05:
+            return False
 
-&#x20;       self.capital = capital
+        if self.current_drawdown() > 0.1:
+            return False
 
+        return True
+```
 
+## 9. 🗄️ Storage
 
-&#x20;   def validate(self, signal):
+### `models.py`
 
-&#x20;       if signal.size > 0.05:
-
-&#x20;           return False
-
-
-
-&#x20;       if self.current\_drawdown() > 0.1:
-
-&#x20;           return False
-
-
-
-&#x20;       return True
-
-9\. 🗄️ Storage
-
-models.py
-
+```python
 class Trade(Base):
+    __tablename__ = "trades"
 
-&#x20;   \_\_tablename\_\_ = "trades"
+    id = Column(String, primary_key=True)
+    wallet = Column(String)
+    market_id = Column(String)
+    side = Column(String)
+    price = Column(Float)
+    size = Column(Float)
+    timestamp = Column(DateTime)
+```
 
+## 10. 🔁 Workers (Core do sistema)
 
+### `tracker_worker.py`
 
-&#x20;   id = Column(String, primary\_key=True)
-
-&#x20;   wallet = Column(String)
-
-&#x20;   market\_id = Column(String)
-
-&#x20;   side = Column(String)
-
-&#x20;   price = Column(Float)
-
-&#x20;   size = Column(Float)
-
-&#x20;   timestamp = Column(DateTime)
-
-10\. 🔁 Workers (Core do sistema)
-
-tracker\_worker.py
-
+```python
 async def run():
+    tracker = WalletTracker(client)
 
-&#x20;   tracker = WalletTracker(client)
+    async for trade in tracker.track():
+        await redis.publish("trades", trade.json())
+```
 
+### `signal_worker.py`
 
-
-&#x20;   async for trade in tracker.track():
-
-&#x20;       await redis.publish("trades", trade.json())
-
-signal\_worker.py
-
+```python
 async def run():
+    async for trade in redis.subscribe("trades"):
+        signal = whale_copy_strategy(trade)
 
-&#x20;   async for trade in redis.subscribe("trades"):
+        if signal:
+            await redis.publish("signals", signal.json())
+```
 
-&#x20;       signal = whale\_copy\_strategy(trade)
+### `execution_worker.py`
 
-
-
-&#x20;       if signal:
-
-&#x20;           await redis.publish("signals", signal.json())
-
-execution\_worker.py
-
+```python
 async def run():
+    async for signal in redis.subscribe("signals"):
+        if risk.validate(signal):
+            await executor.execute(signal)
+```
 
-&#x20;   async for signal in redis.subscribe("signals"):
+## 11. 🔌 API (FastAPI)
 
-&#x20;       if risk.validate(signal):
+### `main.py`
 
-&#x20;           await executor.execute(signal)
-
-11\. 🔌 API (FastAPI)
-
-main.py
-
+```python
 from fastapi import FastAPI
-
-
 
 app = FastAPI()
 
-
-
 @app.get("/health")
-
 def health():
-
-&#x20;   return {"status": "ok"}
-
-
+    return {"status": "ok"}
 
 @app.get("/pnl")
-
 def pnl():
+    return get_pnl()
+```
 
-&#x20;   return get\_pnl()
+## 12. 🐳 Docker Setup
 
-12\. 🐳 Docker Setup
+### `docker-compose.yml`
 
-docker-compose.yml
-
+```yaml
 version: "3.9"
 
-
-
 services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
 
-&#x20; api:
+  redis:
+    image: redis:7
 
-&#x20;   build: .
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: postgres
+```
 
-&#x20;   ports:
+## 13. ⚡ Loop Principal
 
-&#x20;     - "8000:8000"
-
-
-
-&#x20; redis:
-
-&#x20;   image: redis:7
-
-
-
-&#x20; postgres:
-
-&#x20;   image: postgres:15
-
-&#x20;   environment:
-
-&#x20;     POSTGRES\_PASSWORD: postgres
-
-13\. ⚡ Loop Principal
-
+```python
 async def main():
+    await asyncio.gather(
+        tracker_worker.run(),
+        signal_worker.run(),
+        execution_worker.run()
+    )
+```
 
-&#x20;   await asyncio.gather(
-
-&#x20;       tracker\_worker.run(),
-
-&#x20;       signal\_worker.run(),
-
-&#x20;       execution\_worker.run()
-
-&#x20;   )
-
-14\. 📊 Métricas essenciais
-
-
+## 14. 📊 Métricas essenciais
 
 Você precisa trackear:
 
+- ROI por trade
+- ROI por trader copiado
+- tempo de entrada (delay)
+- slippage médio
+- drawdown
 
+## 15. 🚀 Próximos upgrades (alto impacto)
 
-ROI por trade
+- score de trader (Sharpe + consistência)
+- machine learning leve (classificação de sinal)
+- latência ultra baixa (WebSocket + mempool)
+- estratégia contrária (fade traders ruins)
 
-ROI por trader copiado
+## 16. ⚠️ Pontos críticos
 
-Tempo de entrada (delay)
+### Se você errar isso → perde:
 
-Slippage médio
+- entrar atrasado
+- copiar trader ruim (ranking enganoso)
+- não controlar risco
+- ignorar liquidez
 
-Drawdown
+### Se acertar isso → edge real:
 
-15\. 🚀 Próximos upgrades (alto impacto)
-
-Score de trader (Sharpe + consistência)
-
-Machine Learning leve (classificação de sinal)
-
-Latência ultra baixa (WebSocket + mempool)
-
-Estratégia contrária (fade traders ruins)
-
-16\. ⚠️ Pontos críticos (onde você ganha ou perde dinheiro)
-
-
-
-Se você errar isso → perde:
-
-
-
-Entrar atrasado
-
-Copiar trader ruim (ranking enganoso)
-
-Não controlar risco
-
-Ignorar liquidez
-
-
-
-Se acertar isso → edge real:
-
-
-
-Timing + filtragem de trader
-
-Execução rápida
-
-Gestão de risco rígida
-
+- timing + filtragem de trader
+- execução rápida
+- gestão de risco rígida

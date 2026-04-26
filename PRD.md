@@ -1,358 +1,185 @@
-PRD — CopyTrader Polymarket (Short-Term Alpha)
+# PRD — CopyTrader Polymarket (Short-Term Alpha)
 
-1\. 🎯 Objetivo do Produto
-
-
+## 1. 🎯 Objetivo do Produto
 
 Construir um sistema automatizado que:
 
+- Identifique traders de alta performance na Polymarket
+- Extraia padrões de entrada/saída
+- Execute operações de curto prazo (scalping / swing curto)
+- Maximize ROI com controle de risco
 
+### Metas iniciais
 
-Identifique traders de alta performance na Polymarket
+- ROI mensal: 5–15%
+- Drawdown máximo: < 10%
+- Win rate: > 55% (com R/R favorável)
 
-Extraia padrões de entrada/saída
-
-Execute operações de curto prazo (scalping / swing curto)
-
-Maximize ROI com controle de risco
-
-
-
-Meta inicial:
-
-
-
-ROI mensal: 5–15%
-
-Drawdown máximo: <10%
-
-Win rate: >55% (com R/R favorável)
-
-2\. 🧠 Hipótese de Edge
-
-
+## 2. 🧠 Hipótese de Edge
 
 Você não copia o trader — você copia o momento em que ele gera impacto no mercado.
 
+### O edge vem de:
 
+- Detectar wallets consistentes (não só ranking bruto)
+- Identificar early entries (antes da massa)
+- Filtrar mercados com:
+  - baixa liquidez (mais edge)
+  - alta assimetria de informação
 
-Edge vem de:
+## 3. 👤 Usuário alvo
 
+- Você mesmo inicialmente (trader técnico)
+- Depois: produto SaaS / copytrading
 
+## 4. ⚙️ Funcionalidades Principais
 
-Detectar wallets consistentes (não só ranking bruto)
+### 4.1 Ranking Intelligence
 
-Identificar early entries (antes da massa)
+- Scraping/API da Polymarket
+- Identificar:
+  - top traders por ROI
+  - consistência (últimos 7d, 30d, 90d)
+  - volume operado
+  - Sharpe ratio simplificado
 
-Filtrar mercados com:
+**Output:** lista de wallets “seguíveis”.
 
-baixa liquidez (mais edge)
+### 4.2 Wallet Tracker (Core)
 
-alta assimetria de informação
+Monitoramento em tempo real de:
 
-3\. 👤 Usuário alvo
+- trades realizados
+- odds de entrada
+- volume
 
-Você mesmo inicialmente (trader técnico)
+**Detecta:**
 
-Depois: produto SaaS / copytrading
+- entrada relevante (threshold volume)
+- mudança de posição
 
-4\. ⚙️ Funcionalidades Principais
+### 4.3 Signal Engine
 
-4.1 Ranking Intelligence
+Transforma ação da wallet em sinal.
 
-Scraping/API da Polymarket
+#### Exemplo de regra
 
-Identificar:
+- IF trader_top_5
+- AND posição > $X
+- AND mercado liquidez > Y
+- AND odds < threshold
+- THEN gerar sinal de entrada
 
-Top traders por ROI
+#### Features
 
-Consistência (últimos 7d, 30d, 90d)
+- delay-aware (evitar entrar tarde)
+- confidence score (0–1)
 
-Volume operado
+### 4.4 Execution Engine
 
-Sharpe ratio simplificado
+Executa trade automaticamente.
 
+- Entrada: market ou limit inteligente
+- Saída:
+  - take profit (ex: +10–20%)
+  - stop loss (ex: -5–8%)
+  - time-based exit
 
-
-📌 Output:
-
-
-
-Lista de wallets “seguíveis”
-
-4.2 Wallet Tracker (Core)
-
-
-
-Monitoramento em tempo real:
-
-
-
-Trades realizados
-
-Odds de entrada
-
-Volume
-
-
-
-📌 Detecta:
-
-
-
-Entrada relevante (threshold volume)
-
-Mudança de posição
-
-4.3 Signal Engine
-
-
-
-Transforma ação da wallet em sinal:
-
-
-
-Exemplo:
-
-
-
-IF trader\_top\_5
-
-AND posição > $X
-
-AND mercado liquidez > Y
-
-AND odds < threshold
-
-THEN gerar sinal de entrada
-
-Features:
-
-Delay-aware (evitar entrar tarde)
-
-Confidence score (0–1)
-
-4.4 Execution Engine
-
-
-
-Executa trade automaticamente:
-
-
-
-Entrada:
-
-Market ou limit inteligente
-
-Saída:
-
-Take profit (ex: +10–20%)
-
-Stop loss (ex: -5–8%)
-
-Time-based exit
-
-4.5 Risk Manager (ESSENCIAL)
-
-
+### 4.5 Risk Manager (ESSENCIAL)
 
 Sem isso você quebra.
 
+- Max % por trade: 1–5%
+- Max exposição por mercado
+- Stop global diário
 
-
-Max % por trade: 1–5%
-
-Max exposição por mercado
-
-Stop global diário
-
-4.6 Backtesting Engine
-
-
+### 4.6 Backtesting Engine
 
 Simula:
 
+- histórico de trades das wallets
+- performance do copy strategy
 
+### 4.7 Dashboard
 
-Histórico de trades das wallets
+- PnL
+- trades ativos
+- performance por trader seguido
 
-Performance do copy strategy
-
-4.7 Dashboard
-
-PnL
-
-Trades ativos
-
-Performance por trader seguido
-
-5\. 🏗️ Arquitetura
+## 5. 🏗️ Arquitetura
 
 Fluxo:
 
 Polymarket Data → Wallet Tracker → Signal Engine → Execution → Risk Manager → Logs/Dashboard
 
-6\. 🧰 Stack recomendada
+## 6. 🧰 Stack recomendada
 
-🔥 Melhor escolha (pra você): Python
-
-
+### Melhor escolha (pra você): Python
 
 Porque:
 
+- rápido pra testar estratégia
+- ótimo pra data + backtest
 
+### Stack principal
 
-Rápido pra testar estratégia
+- Python
+- FastAPI (API)
+- Web3.py (interação blockchain)
+- Pandas (análise)
+- Redis (cache)
+- PostgreSQL
 
-Ótimo pra data + backtest
+### Alternativa (produção mais robusta)
 
+- TypeScript (Node.js)
+- NestJS
+- ethers.js
+- Redis + Postgres
 
+### C# (menos ideal aqui)
 
-Stack:
+- bom pra backend enterprise
+- mais lento pra iterar estratégia
 
+## 7. 📊 Estratégias iniciais
 
+- **Estratégia 1 — Whale Copy Early**
+  - copiar apenas entradas grandes
+  - delay máximo: 30–60s
+- **Estratégia 2 — Consensus Copy**
+  - só entra se 2+ traders top entram no mesmo lado
+- **Estratégia 3 — Fade Late Traders**
+  - se trader entra tarde → fazer o oposto
+- **Estratégia 4 — Momentum Odds**
+  - entrar quando odds estão se movendo forte + whale confirmou
 
-Python
+## 8. ⚠️ Riscos
 
-FastAPI (API)
+- slippage alto
+- liquidez baixa
+- ranking enviesado (sorte ≠ skill)
+- front-running: impossível competir com bots mais rápidos
+- custos (fees + spread)
 
-Web3.py (interação blockchain)
+## 9. 📅 Roadmap
 
-Pandas (análise)
+### Fase 1 — MVP (2 semanas)
 
-Redis (cache)
+- scraper ranking
+- track wallets
+- log de trades
 
-PostgreSQL
+### Fase 2 — Signals (2–3 semanas)
 
-Alternativa (produção mais robusta):
+- regras básicas
+- simulação manual
 
-TypeScript (Node.js)
+### Fase 3 — Execução (2 semanas)
 
-NestJS
+- integração com carteira
+- execução automatizada
 
-ethers.js
+### Fase 4 — Backtest + otimização
 
-Redis + Postgres
-
-C# (menos ideal aqui)
-
-Bom pra backend enterprise
-
-Mais lento pra iterar estratégia
-
-7\. 📊 Estratégias iniciais
-
-Estratégia 1 — Whale Copy Early
-
-Copiar apenas entradas grandes
-
-Delay máximo: 30–60s
-
-Estratégia 2 — Consensus Copy
-
-Só entra se 2+ traders top entram no mesmo lado
-
-Estratégia 3 — Fade Late Traders
-
-Se trader entra tarde → fazer o oposto
-
-Estratégia 4 — Momentum Odds
-
-Entrar quando odds estão se movendo forte + whale confirmou
-
-8\. ⚠️ Riscos
-
-Slippage alto
-
-Liquidez baixa
-
-Ranking enviesado (sorte ≠ skill)
-
-Front-running impossível competir com bots mais rápidos
-
-Custos (fees + spread)
-
-9\. 📅 Roadmap
-
-Fase 1 — MVP (2 semanas)
-
-Scraper ranking
-
-Track wallets
-
-Log de trades
-
-Fase 2 — Signals (2–3 semanas)
-
-Regras básicas
-
-Simulação manual
-
-Fase 3 — Execução (2 semanas)
-
-Integração com carteira
-
-Execução automatizada
-
-Fase 4 — Backtest + otimização
-
-Ajuste de parâmetros
-
-Filtrar traders bons de verdade
-
-10\. 💡 Diferencial (onde você ganha dinheiro)
-
-
-
-Se fizer só copy → perde
-
-
-
-Se fizer isso → ganha:
-
-
-
-Score de qualidade de trader (não ranking simples)
-
-Timing de entrada (ESSENCIAL)
-
-Combinação de múltiplos traders
-
-Gestão de risco agressiva mas controlada
-
-11\. 🧪 MVP técnico (pseudo fluxo)
-
-while True:
-
-&#x20;   trades = get\_recent\_trades()
-
-
-
-&#x20;   for trade in trades:
-
-&#x20;       if is\_top\_trader(trade.wallet):
-
-&#x20;           signal = generate\_signal(trade)
-
-
-
-&#x20;           if signal.confidence > 0.7:
-
-&#x20;               execute\_trade(signal)
-
-12\. Próximo nível (onde vira produto de verdade)
-
-Copytrading como serviço (SaaS)
-
-Ranking próprio (melhor que Polymarket)
-
-AI para prever probabilidade real vs odds
-
-13\. 💰 Monetização futura
-
-% sobre lucro
-
-Assinatura mensal
-
-Copytrading pool
-
+- ajuste de parâmetros
