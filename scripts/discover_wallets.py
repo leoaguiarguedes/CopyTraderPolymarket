@@ -21,9 +21,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import argparse
 import yaml
 
+from decimal import Decimal
+
 from app.config import get_settings
 from app.data.polymarket_rest import PolymarketRestClient
 from app.data.subgraph_client import SubgraphClient
+from app.storage.db import AsyncSessionFactory
+from app.storage import models as orm
 from app.tracker.proxy_resolver import ProxyResolver
 from app.tracker.scoring import WalletScore, compute_score, score_is_finite
 from app.utils.logger import configure_logging, get_logger
@@ -116,6 +120,47 @@ async def discover(
 
     log.info("discover.done", output=str(out_path), wallets_written=len(wallet_entries))
     print(f"\n✓ {len(wallet_entries)} wallets written to {out_path}")
+
+    # ── Step 6: persist to DB ─────────────────────────────────────────────
+    try:
+        async with AsyncSessionFactory() as session:
+            for score, entry in zip(trackable, wallet_entries):
+                address = entry["address"]
+                # Upsert Wallet row
+                wallet = await session.get(orm.Wallet, address)
+                if wallet is None:
+                    wallet = orm.Wallet(
+                        address=address,
+                        proxy_address=entry.get("owner_address"),
+                        label=entry.get("label"),
+                        is_tracked=True,
+                    )
+                    session.add(wallet)
+                else:
+                    wallet.is_tracked = True
+
+                # Insert new score row (keeps history)
+                score_row = orm.WalletScore(
+                    wallet_address=address,
+                    window_days=days,
+                    n_trades=score.n_trades,
+                    roi=Decimal(str(round(score.roi, 8))),
+                    sharpe=Decimal(str(round(score.sharpe, 8))),
+                    win_rate=Decimal(str(round(score.win_rate, 6))),
+                    max_drawdown=Decimal(str(round(score.max_drawdown, 8))),
+                    total_volume_usd=Decimal(str(round(score.total_volume_usd, 2))),
+                    avg_holding_minutes=Decimal(str(round(score.avg_holding_minutes, 2))),
+                    median_holding_minutes=Decimal(str(round(score.median_holding_minutes, 2))),
+                    pct_closed_under_24h=Decimal(str(round(score.pct_closed_under_24h, 6))),
+                )
+                session.add(score_row)
+
+            await session.commit()
+            log.info("discover.db_persisted", wallets=len(wallet_entries))
+            print(f"✓ {len(wallet_entries)} wallets persisted to DB")
+    except Exception as exc:
+        log.warning("discover.db_persist_failed", error=str(exc)[:120])
+        print(f"⚠ DB persist failed (is the DB running?): {exc}")
 
     # Print top 10 summary
     print("\nTop 10 by Sharpe:")

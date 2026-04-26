@@ -3,6 +3,7 @@
  * Usage: const cleanup = subscribeToLiveFeed(handler);  // call cleanup() to disconnect
  */
 
+// WebSocket always runs in the browser — use the public-facing URL.
 const WS_URL =
   (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000")
     .replace(/^https?/, "ws") + "/ws/live";
