@@ -37,6 +37,11 @@ services:
     env_file: .env
     ports:
       - "8000:8000"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - ./config:/home/app/config
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,6 +76,11 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - ./config:/home/app/config
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,6 +94,11 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - ./config:/home/app/config
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,6 +112,11 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - ./config:/home/app/config
     depends_on:
       postgres:
         condition: service_healthy
@@ -110,6 +130,11 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - ./config:/home/app/config
     depends_on:
       postgres:
         condition: service_healthy
