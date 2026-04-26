@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.storage.db import get_db
@@ -39,7 +38,7 @@ async def get_pnl_summary(
             func.sum(orm.Position.realized_pnl_usd).label("total_pnl"),
             func.sum(orm.Position.size_usd).label("total_volume"),
             func.sum(
-                func.case((orm.Position.realized_pnl_usd > 0, 1), else_=0)
+                case((orm.Position.realized_pnl_usd > 0, 1), else_=0)
             ).label("wins"),
         ).where(
             orm.Position.closed_at >= cutoff,

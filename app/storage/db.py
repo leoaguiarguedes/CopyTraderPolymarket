@@ -37,3 +37,8 @@ SessionLocal = async_sessionmaker(
 async def get_session() -> AsyncIterator[AsyncSession]:
     async with SessionLocal() as session:
         yield session
+
+
+# Aliases used by API routes and workers
+get_db = get_session
+AsyncSessionFactory = SessionLocal
