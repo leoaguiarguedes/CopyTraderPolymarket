@@ -185,6 +185,9 @@ class BacktestRun(Base):
     wallets_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     params_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
+    signals_total: Mapped[int] = mapped_column(nullable=False, default=0)
+    signals_approved: Mapped[int] = mapped_column(nullable=False, default=0)
+    signals_rejected: Mapped[int] = mapped_column(nullable=False, default=0)
     n_trades: Mapped[int | None] = mapped_column(nullable=True)
     total_pnl_usd: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
     roi: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
@@ -193,6 +196,7 @@ class BacktestRun(Base):
     win_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
     pct_timeout_exits: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
     metrics_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    positions_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False, index=True

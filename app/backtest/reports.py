@@ -119,13 +119,14 @@ def generate_html_report(result: "BacktestResult", metrics: "BacktestMetrics | N
         pnl = float(p.realized_pnl_usd)  # type: ignore[arg-type]
         color = _color(pnl)
         holding = f"{(p.closed_at - p.opened_at).total_seconds() / 60:.0f}m" if p.closed_at and p.opened_at else ""
+        exit_price = f"{float(p.exit_price):.4f}" if p.exit_price is not None else ""
         positions_rows += f"""
         <tr>
           <td>{p.strategy}</td>
           <td style="font-size:0.75em">{p.market_id[:16]}…</td>
           <td>{p.side}</td>
           <td>{float(p.entry_price):.4f}</td>
-          <td>{float(p.exit_price):.4f if p.exit_price else ""}</td>
+          <td>{exit_price}</td>
           <td>{float(p.size_usd):.2f}</td>
           <td style="color:{color};font-weight:600">{_fmt_usd(pnl)}</td>
           <td>{p.exit_reason}</td>

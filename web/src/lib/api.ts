@@ -159,8 +159,8 @@ export function fetchSignals(
   return get<Signal[]>("/signals", { limit, strategy, status });
 }
 
-export function fetchWallets() {
-  return get<WalletScore[]>("/wallets");
+export function fetchWallets(limit = 200) {
+  return get<WalletScore[]>("/wallets", { limit });
 }
 
 export function fetchKillSwitch() {

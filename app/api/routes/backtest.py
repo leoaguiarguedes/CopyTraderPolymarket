@@ -30,6 +30,7 @@ from app.backtest.grid_search import GridSearchEngine, GridSearchResult
 from app.backtest.metrics import BacktestMetrics, compute_metrics
 from app.backtest.reports import generate_csv, generate_html_report
 from app.backtest.walk_forward import WalkForwardEngine, WalkForwardResult
+from app.execution.base import Position
 from app.storage.db import AsyncSessionFactory
 from app.storage.models import BacktestRun
 from app.utils.logger import get_logger
@@ -92,6 +93,79 @@ def _row_to_summary(row: BacktestRun) -> RunSummary:
     )
 
 
+def _position_to_dict(position: Position) -> dict[str, Any]:
+    return {
+        "position_id": position.position_id,
+        "signal_id": position.signal_id,
+        "strategy": position.strategy,
+        "market_id": position.market_id,
+        "asset_id": position.asset_id,
+        "side": position.side,
+        "entry_price": str(position.entry_price),
+        "size_usd": str(position.size_usd),
+        "size_tokens": str(position.size_tokens),
+        "tp_price": str(position.tp_price),
+        "sl_price": str(position.sl_price),
+        "max_holding_minutes": position.max_holding_minutes,
+        "opened_at": position.opened_at.isoformat(),
+        "closed_at": position.closed_at.isoformat() if position.closed_at else None,
+        "exit_price": str(position.exit_price) if position.exit_price is not None else None,
+        "realized_pnl_usd": str(position.realized_pnl_usd) if position.realized_pnl_usd is not None else None,
+        "exit_reason": position.exit_reason,
+    }
+
+
+def _position_from_dict(data: dict[str, Any]) -> Position:
+    return Position(
+        position_id=data["position_id"],
+        signal_id=data["signal_id"],
+        strategy=data["strategy"],
+        market_id=data["market_id"],
+        asset_id=data["asset_id"],
+        side=data["side"],
+        entry_price=Decimal(str(data["entry_price"])),
+        size_usd=Decimal(str(data["size_usd"])),
+        size_tokens=Decimal(str(data["size_tokens"])),
+        tp_price=Decimal(str(data["tp_price"])),
+        sl_price=Decimal(str(data["sl_price"])),
+        max_holding_minutes=int(data["max_holding_minutes"]),
+        opened_at=datetime.fromisoformat(data["opened_at"]),
+        closed_at=datetime.fromisoformat(data["closed_at"]) if data.get("closed_at") else None,
+        exit_price=Decimal(str(data["exit_price"])) if data.get("exit_price") is not None else None,
+        realized_pnl_usd=Decimal(str(data["realized_pnl_usd"])) if data.get("realized_pnl_usd") is not None else None,
+        exit_reason=data.get("exit_reason", ""),
+    )
+
+
+def _result_from_row(row: BacktestRun) -> BacktestResult:
+    return BacktestResult(
+        run_id=row.run_id,
+        strategy=row.strategy,
+        start_date=row.start_date,
+        end_date=row.end_date,
+        wallets=json.loads(row.wallets_json or "[]"),
+        params=json.loads(row.params_json or "{}"),
+        positions=[_position_from_dict(item) for item in json.loads(row.positions_json or "[]")],
+        signals_total=row.signals_total,
+        signals_approved=row.signals_approved,
+        signals_rejected=row.signals_rejected,
+        error=row.error or "",
+        finished_at=row.finished_at,
+    )
+
+
+async def _load_result(run_id: str) -> BacktestResult | None:
+    cached = _results.get(run_id)
+    if cached is not None:
+        return cached
+
+    async with AsyncSessionFactory() as session:
+        row = await session.get(BacktestRun, run_id)
+    if row is None or not row.positions_json:
+        return None
+    return _result_from_row(row)
+
+
 async def _persist_run(result: BacktestResult, metrics: BacktestMetrics | None) -> None:
     """Upsert a BacktestRun row in the DB."""
     try:
@@ -111,6 +185,10 @@ async def _persist_run(result: BacktestResult, metrics: BacktestMetrics | None) 
             row.status = "error" if result.error else "done"
             row.error = result.error
             row.finished_at = result.finished_at
+            row.signals_total = result.signals_total
+            row.signals_approved = result.signals_approved
+            row.signals_rejected = result.signals_rejected
+            row.positions_json = json.dumps([_position_to_dict(p) for p in result.positions])
 
             if metrics:
                 row.n_trades = metrics.n_trades
@@ -286,9 +364,9 @@ async def get_run_metrics(run_id: str):
 @router.get("/runs/{run_id}/report", response_class=HTMLResponse)
 async def get_run_report(run_id: str):
     """Return self-contained HTML report for a run."""
-    result = _results.get(run_id)
+    result = await _load_result(run_id)
     if result is None:
-        raise HTTPException(404, "run not found or server restarted (report lost)")
+        raise HTTPException(404, "run not found")
     metrics = compute_metrics(result.positions)
     html = generate_html_report(result, metrics)
     return HTMLResponse(content=html)
@@ -297,9 +375,9 @@ async def get_run_report(run_id: str):
 @router.get("/runs/{run_id}/csv")
 async def get_run_csv(run_id: str):
     """Return CSV of all positions for a run."""
-    result = _results.get(run_id)
+    result = await _load_result(run_id)
     if result is None:
-        raise HTTPException(404, "run not found or server restarted")
+        raise HTTPException(404, "run not found")
     csv_str = generate_csv(result.positions)
     return PlainTextResponse(
         content=csv_str,
@@ -381,6 +459,7 @@ async def _run_grid_search(req: GridSearchRequest, run_id: str) -> None:
         capital_usd=req.capital_usd,
         top_n=req.top_n,
     )
+    result.run_id = run_id
     result.wallets = wallets
     _grid_results[run_id] = result
 
@@ -390,6 +469,16 @@ async def start_grid_search(req: GridSearchRequest, bg: BackgroundTasks):
     """Enqueue a grid search. Returns run_id immediately."""
     import uuid as _uuid
     run_id = str(_uuid.uuid4())
+    _grid_results[run_id] = GridSearchResult(
+        run_id=run_id,
+        strategy=req.strategy,
+        start_date=req.start_date,
+        end_date=req.end_date,
+        wallets=req.wallets,
+        param_grid=req.param_grid,
+        total_combinations=0,
+        completed=0,
+    )
     bg.add_task(_run_grid_search, req, run_id)
     return {"run_id": run_id, "status": "running"}
 
@@ -463,6 +552,7 @@ async def _run_walk_forward(req: WalkForwardRequest, run_id: str) -> None:
         params=req.params,
         capital_usd=req.capital_usd,
     )
+    result.run_id = run_id
     result.wallets = wallets
     _wf_results[run_id] = result
 
@@ -472,6 +562,15 @@ async def start_walk_forward(req: WalkForwardRequest, bg: BackgroundTasks):
     """Enqueue a walk-forward validation run."""
     import uuid as _uuid
     run_id = str(_uuid.uuid4())
+    _wf_results[run_id] = WalkForwardResult(
+        run_id=run_id,
+        strategy=req.strategy,
+        full_start=req.start_date,
+        full_end=req.end_date,
+        split_date=req.start_date,
+        wallets=req.wallets,
+        params=req.params,
+    )
     bg.add_task(_run_walk_forward, req, run_id)
     return {"run_id": run_id, "status": "running"}
 
