@@ -51,7 +51,7 @@ def test_load_wallet_addresses_returns_empty_on_failure(monkeypatch):
 async def test_fetch_recent_fills_queries_both_sides(monkeypatch):
     class FakeSubgraph:
         def __init__(self):
-            self._s = SimpleNamespace(subgraph_orderbook_url="https://orderbook")
+            self._s = SimpleNamespace(subgraph_url="https://orderbook")
 
         async def _query(self, url, query, variables, timeout=15.0):
             return {"orderFilledEvents": [{"taker": "0xabc", "maker": "0xdef", "makerAmountFilled": "1000000", "takerAmountFilled": "1000000"}]}

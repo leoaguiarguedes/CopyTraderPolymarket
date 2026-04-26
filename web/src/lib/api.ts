@@ -111,7 +111,10 @@ export const SignalSchema = z.object({
 export type Signal = z.infer<typeof SignalSchema>;
 
 export const WalletScoreSchema = z.object({
-  wallet: z.string(),
+  address: z.string(),
+  proxy_address: z.string().nullable().optional(),
+  label: z.string().nullable().optional(),
+  is_tracked: z.boolean().optional(),
   score: z.number().optional(),
   n_trades: z.number().optional(),
   sharpe: z.number().optional(),
@@ -204,4 +207,14 @@ export async function runDiscoverWallets(days: number, limit: number, source: "o
     stdout: string;
     stderr: string;
   }>(`/control/discover-wallets?days=${days}&limit=${limit}&source=${source}`);
+}
+
+export async function fetchWorkerLogs(name: "collector" | "tracker" | "signal" | "execution", tail = 120) {
+  return get<{
+    name: string;
+    running: boolean;
+    pid: number | null;
+    log_started_at: string | null;
+    lines: string[];
+  }>("/control/workers/logs", { name, tail });
 }

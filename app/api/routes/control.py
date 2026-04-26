@@ -7,11 +7,16 @@ For production, prefer an external process supervisor (Compose/K8s/systemd).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import shlex
 import subprocess
 import sys
+import threading
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from collections import deque
+from dataclasses import field
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -43,6 +48,9 @@ class _Proc:
     name: str
     cmd: list[str]
     p: subprocess.Popen[str] | None = None
+    log_lines: deque[str] = field(default_factory=lambda: deque(maxlen=400))
+    log_started_at: str | None = None
+    _log_thread: threading.Thread | None = None
 
 
 _WORKERS: dict[str, _Proc] = {
@@ -53,11 +61,43 @@ _WORKERS: dict[str, _Proc] = {
 }
 
 
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _start_log_reader(proc: _Proc) -> None:
+    p = proc.p
+    if p is None or p.stdout is None:
+        return
+
+    proc.log_started_at = _utc_now_iso()
+    proc.log_lines.append(f"[{proc.log_started_at}] log stream started")
+
+    def _run() -> None:
+        try:
+            # Drain stdout continuously so buffers don't fill.
+            for line in iter(p.stdout.readline, ""):
+                if not line:
+                    break
+                proc.log_lines.append(line.rstrip("\n"))
+        except Exception as exc:
+            proc.log_lines.append(f"[{_utc_now_iso()}] log reader error: {str(exc)[:120]}")
+        finally:
+            with contextlib.suppress(Exception):
+                rc = p.poll()
+            proc.log_lines.append(f"[{_utc_now_iso()}] process exited rc={rc}")
+
+    t = threading.Thread(target=_run, name=f"logreader-{proc.name}", daemon=True)
+    proc._log_thread = t
+    t.start()
+
+
 class WorkerStatus(BaseModel):
     name: str
     running: bool
     pid: int | None = None
     cmd: list[str]
+    log_started_at: str | None = None
 
 
 class StartWorkersResponse(BaseModel):
@@ -68,7 +108,13 @@ class StartWorkersResponse(BaseModel):
 def _status(proc: _Proc) -> WorkerStatus:
     running = proc.p is not None and proc.p.poll() is None
     pid = proc.p.pid if running and proc.p is not None else None
-    return WorkerStatus(name=proc.name, running=running, pid=pid, cmd=proc.cmd)
+    return WorkerStatus(
+        name=proc.name,
+        running=running,
+        pid=pid,
+        cmd=proc.cmd,
+        log_started_at=proc.log_started_at,
+    )
 
 
 @router.get("/workers", response_model=list[WorkerStatus])
@@ -97,16 +143,19 @@ async def workers_start(
             already.append(_status(proc))
             continue
 
-        # NOTE: we intentionally don't pipe stdout/stderr here to avoid deadlocks.
-        # Logs go to container stdout (docker logs).
+        proc.log_lines.clear()
+        proc.log_started_at = None
+
         proc.p = subprocess.Popen(
             proc.cmd,
             cwd=os.getcwd(),
-            stdout=None,
-            stderr=None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
+            bufsize=1,
             env=os.environ.copy(),
         )
+        _start_log_reader(proc)
         log.info("control.worker_started", worker=proc.name, pid=proc.p.pid)
         started.append(_status(proc))
 
@@ -132,6 +181,33 @@ async def workers_stop(
             proc.p.terminate()
     await asyncio.sleep(0.2)
     return [_status(_WORKERS[k]) for k in keys]
+
+
+class WorkerLogsResponse(BaseModel):
+    name: str
+    running: bool
+    pid: int | None = None
+    log_started_at: str | None = None
+    lines: list[str]
+
+
+@router.get("/workers/logs", response_model=WorkerLogsResponse)
+async def worker_logs(
+    request: Request,
+    name: Literal["collector", "tracker", "signal", "execution"] = Query(...),
+    tail: int = Query(default=120, ge=10, le=400),
+):
+    _require_control_token(request)
+    proc = _WORKERS[name]
+    st = _status(proc)
+    lines = list(proc.log_lines)[-tail:]
+    return WorkerLogsResponse(
+        name=st.name,
+        running=st.running,
+        pid=st.pid,
+        log_started_at=st.log_started_at,
+        lines=lines,
+    )
 
 
 class DiscoverWalletsResponse(BaseModel):

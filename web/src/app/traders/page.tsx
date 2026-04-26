@@ -1,6 +1,7 @@
 import { fetchWallets } from "@/lib/api";
 import { fmtPct, fmtMinutes, shortAddr, fmtUsd } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import InfoTip from "@/components/InfoTip";
 
 export const dynamic = "force-dynamic";
 
@@ -22,16 +23,56 @@ export default async function TradersPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-zinc-500 text-xs uppercase tracking-wide bg-zinc-900 border-b border-zinc-800">
-              <th className="px-4 py-3 text-left">#</th>
-              <th className="px-4 py-3 text-left">Carteira</th>
-              <th className="px-4 py-3 text-right">Negócios</th>
-              <th className="px-4 py-3 text-right">Sharpe</th>
-              <th className="px-4 py-3 text-right">ROI</th>
-              <th className="px-4 py-3 text-right">Taxa de acerto</th>
-              <th className="px-4 py-3 text-right">Máx. DD</th>
-              <th className="px-4 py-3 text-right">Tempo médio</th>
-              <th className="px-4 py-3 text-right">Volume</th>
-              <th className="px-4 py-3 text-right">Status</th>
+              <th className="px-4 py-3 text-left">
+                <span className="inline-flex items-center gap-1">
+                  # <InfoTip text="Posição no ranking (ordenado por Sharpe desc)." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-left">
+                <span className="inline-flex items-center gap-1">
+                  Carteira <InfoTip text="Endereço da carteira rastreada (encurtado)." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right">
+                <span className="inline-flex items-center gap-1 justify-end w-full">
+                  Negócios <InfoTip text="Número de trades usados no score mais recente." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right">
+                <span className="inline-flex items-center gap-1 justify-end w-full">
+                  Sharpe <InfoTip text="Sharpe do período do score (ajuste risco/retorno)." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right">
+                <span className="inline-flex items-center gap-1 justify-end w-full">
+                  ROI <InfoTip text="Retorno sobre capital no período do score." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right">
+                <span className="inline-flex items-center gap-1 justify-end w-full">
+                  Taxa de acerto <InfoTip text="Percentual de trades vencedores no período." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right">
+                <span className="inline-flex items-center gap-1 justify-end w-full">
+                  Máx. DD <InfoTip text="Máximo drawdown observado no período do score." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right">
+                <span className="inline-flex items-center gap-1 justify-end w-full">
+                  Tempo médio <InfoTip text="Tempo mediano/médio de holding (minutos) no período." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right">
+                <span className="inline-flex items-center gap-1 justify-end w-full">
+                  Volume <InfoTip text="Volume total em USD (aprox.) no período do score." />
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right">
+                <span className="inline-flex items-center gap-1 justify-end w-full">
+                  Status <InfoTip text="Se a carteira está ativa no recorte (ou apenas rastreada)." />
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800 bg-zinc-950">
@@ -51,13 +92,13 @@ export default async function TradersPage() {
             )}
             {wallets.map((w, i) => (
               <tr
-                key={w.wallet}
+                key={w.address}
                 className="hover:bg-zinc-900/60 transition"
               >
                 <td className="px-4 py-3 text-zinc-500">{i + 1}</td>
                 <td className="px-4 py-3 font-mono text-xs">
-                  <span className="text-zinc-200" title={w.wallet}>
-                    {shortAddr(w.wallet)}
+                  <span className="text-zinc-200" title={w.address}>
+                    {shortAddr(w.address)}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right text-zinc-300">

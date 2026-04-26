@@ -1,5 +1,6 @@
 import { fetchPositions } from "@/lib/api";
 import { cn, fmtUsd, fmtMinutes, fmtTime, shortAddr } from "@/lib/utils";
+import InfoTip from "@/components/InfoTip";
 
 export const dynamic = "force-dynamic";
 
@@ -22,16 +23,56 @@ export default async function PortfolioPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-zinc-500 text-xs uppercase tracking-wide bg-zinc-900 border-b border-zinc-800">
-                <th className="px-4 py-3 text-left">Mercado</th>
-                <th className="px-4 py-3 text-left">Estratégia</th>
-                <th className="px-4 py-3 text-left">Lado</th>
-                <th className="px-4 py-3 text-right">Entrada</th>
-                <th className="px-4 py-3 text-right">Tamanho</th>
-                <th className="px-4 py-3 text-right">TP</th>
-                <th className="px-4 py-3 text-right">SL</th>
-                <th className="px-4 py-3 text-right">Idade</th>
-                <th className="px-4 py-3 text-right">Saída em</th>
-                <th className="px-4 py-3 text-left">Aberta em</th>
+                <th className="px-4 py-3 text-left">
+                  <span className="inline-flex items-center gap-1">
+                    Mercado <InfoTip text="Mercado (market_id) da posição (encurtado)." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <span className="inline-flex items-center gap-1">
+                    Estratégia <InfoTip text="Estratégia que originou a posição." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <span className="inline-flex items-center gap-1">
+                    Lado <InfoTip text="YES/NO (direção da posição)." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    Entrada <InfoTip text="Preço de entrada executado." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    Tamanho <InfoTip text="Tamanho em USD (notional) da posição." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    TP <InfoTip text="Preço alvo de take-profit." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    SL <InfoTip text="Preço de stop-loss." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    Idade <InfoTip text="Tempo desde abertura (minutos)." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    Saída em <InfoTip text="Tempo restante até forçar saída por timeout." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <span className="inline-flex items-center gap-1">
+                    Aberta em <InfoTip text="Timestamp de abertura da posição." />
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800 bg-zinc-950">
@@ -127,15 +168,51 @@ export default async function PortfolioPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-zinc-500 text-xs uppercase tracking-wide bg-zinc-900 border-b border-zinc-800">
-                <th className="px-4 py-3 text-left">Mercado</th>
-                <th className="px-4 py-3 text-left">Estratégia</th>
-                <th className="px-4 py-3 text-left">Lado</th>
-                <th className="px-4 py-3 text-right">Entrada</th>
-                <th className="px-4 py-3 text-right">Saída</th>
-                <th className="px-4 py-3 text-right">Tamanho</th>
-                <th className="px-4 py-3 text-right">P/L</th>
-                <th className="px-4 py-3 text-left">Motivo</th>
-                <th className="px-4 py-3 text-left">Fechada em</th>
+                <th className="px-4 py-3 text-left">
+                  <span className="inline-flex items-center gap-1">
+                    Mercado <InfoTip text="Mercado (market_id) da posição (encurtado)." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <span className="inline-flex items-center gap-1">
+                    Estratégia <InfoTip text="Estratégia que originou a posição." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <span className="inline-flex items-center gap-1">
+                    Lado <InfoTip text="YES/NO (direção da posição)." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    Entrada <InfoTip text="Preço de entrada executado." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    Saída <InfoTip text="Preço de saída (quando fechada)." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    Tamanho <InfoTip text="Tamanho em USD (notional) da posição." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    P/L <InfoTip text="Lucro/prejuízo realizado em USD." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <span className="inline-flex items-center gap-1">
+                    Motivo <InfoTip text="Motivo do fechamento (tp/sl/timeout/outro)." />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <span className="inline-flex items-center gap-1">
+                    Fechada em <InfoTip text="Timestamp de fechamento da posição." />
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800 bg-zinc-950">
