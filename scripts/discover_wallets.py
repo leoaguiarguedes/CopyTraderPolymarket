@@ -36,6 +36,7 @@ async def discover(
     limit: int = 500,
     output: str = "config/tracked_wallets.yaml",
     min_volume_usd: float = 500.0,
+    source: str = "orderbook",
 ) -> None:
     configure_logging()
     settings = get_settings()
@@ -44,12 +45,23 @@ async def discover(
     rest = PolymarketRestClient(settings)
     resolver = ProxyResolver(client=rest)
 
-    log.info("discover.starting", days=days, limit=limit)
+    log.info("discover.starting", days=days, limit=limit, source=source)
 
-    # ── Step 1: leaderboard ───────────────────────────────────────────────
-    log.info("discover.fetching_leaderboard")
-    top_wallets = await subgraph.get_top_wallets(limit=limit, min_volume_usd=min_volume_usd)
-    log.info("discover.leaderboard_fetched", count=len(top_wallets))
+    # ── Step 1: wallet candidates ─────────────────────────────────────────
+    if source == "orderbook":
+        # Primary: discover from CLOB orderbook fills (current activity)
+        log.info("discover.fetching_active_wallets_from_orderbook")
+        top_wallets = await subgraph.get_active_wallets(
+            days_back=days,
+            min_fills=20,
+            max_fills_in_sample=300,  # skip bots (>300 fills in sample = market maker)
+            limit=limit,
+        )
+    else:
+        # Fallback: pnl-subgraph leaderboard (historical, often inactive)
+        log.info("discover.fetching_leaderboard")
+        top_wallets = await subgraph.get_top_wallets(limit=limit, min_pnl_usd=min_volume_usd)
+    log.info("discover.candidates_fetched", count=len(top_wallets))
 
     # ── Step 2: score each wallet ─────────────────────────────────────────
     scores: list[WalletScore] = []
@@ -125,8 +137,22 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=500, help="Max wallets to evaluate")
     parser.add_argument("--output", default="config/tracked_wallets.yaml")
     parser.add_argument("--min-volume", type=float, default=500.0)
+    parser.add_argument(
+        "--source",
+        choices=["orderbook", "pnl"],
+        default="orderbook",
+        help="orderbook = discover from recent CLOB fills (recommended); pnl = historical leaderboard",
+    )
     args = parser.parse_args()
-    asyncio.run(discover(days=args.days, limit=args.limit, output=args.output, min_volume_usd=args.min_volume))
+    asyncio.run(
+        discover(
+            days=args.days,
+            limit=args.limit,
+            output=args.output,
+            min_volume_usd=args.min_volume,
+            source=args.source,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -108,7 +108,8 @@ class WalletTrade:
     outcome: str
     side: OrderSide
     price: Decimal
-    size_usd: Decimal
+    size_usd: Decimal          # total USDC volume (buys + sells)
+    cost_usd: Decimal          # capital invested (buys only = usdc_in)
     opened_at: datetime
     closed_at: datetime | None  # None = still open
     realized_pnl_usd: Decimal | None = None  # set when closed

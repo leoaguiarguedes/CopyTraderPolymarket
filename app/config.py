@@ -50,10 +50,16 @@ class Settings(BaseSettings):
     polymarket_data_url: str = "https://data-api.polymarket.com"
     polymarket_ws_url: str = "wss://ws-subscriptions-clob.polymarket.com/ws"
 
-    # ── Subgraph ──────────────────────────────────────────────────
+    # ── Subgraph (Goldsky) ────────────────────────────────────────────────
+    # Orderbook: OrderFilledEvent — trade history + scoring
     subgraph_url: str = (
         "https://api.goldsky.com/api/public/"
-        "project_cl6mb8i9h0003e201j6li0diw/subgraphs/polymarket-orderbook/0.0.7/gn"
+        "project_cl6mb8i9h0003e201j6li0diw/subgraphs/orderbook-subgraph/0.0.1/gn"
+    )
+    # PnL: UserPosition — leaderboard discovery
+    subgraph_pnl_url: str = (
+        "https://api.goldsky.com/api/public/"
+        "project_cl6mb8i9h0003e201j6li0diw/subgraphs/pnl-subgraph/0.0.14/gn"
     )
     subgraph_api_key: SecretStr | None = None
 
