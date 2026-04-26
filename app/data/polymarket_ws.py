@@ -23,7 +23,7 @@ from app.utils.time import utcnow
 
 log = get_logger(__name__)
 
-_WS_PATH = "/ws/market"
+_WS_PATH = "/market"  # base URL already ends in /ws
 _INITIAL_BACKOFF = 1.0
 _MAX_BACKOFF = 60.0
 

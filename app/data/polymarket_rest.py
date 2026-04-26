@@ -55,7 +55,10 @@ class PolymarketRestClient:
             params["closed"] = "false"
         r = await self._gamma.get("/markets", params=params)
         r.raise_for_status()
-        return [self._parse_market(m) for m in r.json()]
+        payload = r.json()
+        # Gamma API may return {"data": [...]} or a plain list
+        items: list = payload.get("data", payload) if isinstance(payload, dict) else payload
+        return [self._parse_market(m) for m in items if isinstance(m, dict)]
 
     @retry(wait=wait_exponential(min=1, max=30), stop=stop_after_attempt(5), reraise=True)
     async def get_market(self, condition_id: str) -> Market | None:
@@ -65,19 +68,19 @@ class PolymarketRestClient:
         r.raise_for_status()
         return self._parse_market(r.json())
 
-    async def get_all_active_markets(self) -> list[Market]:
-        """Paginate through all active markets."""
+    async def get_all_active_markets(self, max_markets: int = 2000) -> list[Market]:
+        """Paginate through active markets up to max_markets (default 2000)."""
         markets: list[Market] = []
         offset = 0
         limit = 100
-        while True:
+        while len(markets) < max_markets:
             page = await self.get_markets(active=True, limit=limit, offset=offset)
             markets.extend(page)
             if len(page) < limit:
                 break
             offset += limit
         log.info("rest.markets_fetched", total=len(markets))
-        return markets
+        return markets[:max_markets]
 
     # ── Proxy wallet ──────────────────────────────────────────────────────
 
@@ -156,8 +159,20 @@ class PolymarketRestClient:
             except (ValueError, TypeError):
                 pass
 
-        tokens: list[dict[str, Any]] = raw.get("tokens", []) or raw.get("clobTokenIds", [])
-        token_ids = [str(t.get("token_id") or t) for t in tokens if t]
+        # "tokens" may be a JSON string '["id1","id2"]', a list of dicts, or a list of strings
+        tokens_raw = raw.get("tokens", []) or raw.get("clobTokenIds", [])
+        if isinstance(tokens_raw, str):
+            try:
+                import json as _json
+                tokens_raw = _json.loads(tokens_raw)
+            except Exception:
+                tokens_raw = []
+        token_ids: list[str] = []
+        for t in (tokens_raw or []):
+            if isinstance(t, dict):
+                token_ids.append(str(t.get("token_id") or t.get("tokenID") or ""))
+            elif t:
+                token_ids.append(str(t))
 
         return Market(
             condition_id=raw.get("conditionId") or raw.get("condition_id", ""),
