@@ -88,6 +88,21 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr | None = None
     telegram_chat_id: str | None = None
 
+    # ── Fase 4: Kelly sizing ──────────────────────────────────────
+    kelly_fraction: float = Field(default=0.25, gt=0, le=1.0)
+    kelly_min_pct: float = Field(default=0.005, gt=0, le=0.5)
+    kelly_max_pct: float = Field(default=0.05, gt=0, le=0.5)
+
+    # ── Fase 4: Circuit breaker ───────────────────────────────────
+    circuit_breaker_max_consecutive: int = Field(default=3, gt=0)
+    circuit_breaker_sigma: float = Field(default=2.0, gt=0)
+
+    # ── Fase 4: Reconciliation ────────────────────────────────────
+    reconciliation_interval_seconds: int = Field(default=300, gt=0)
+
+    # ── Fase 4: Daily allocation cap ─────────────────────────────
+    max_daily_allocation_usd: float = Field(default=0.0, ge=0)  # 0 = no cap
+
     @property
     def is_production(self) -> bool:
         return self.app_env == AppEnv.production

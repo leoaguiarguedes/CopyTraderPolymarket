@@ -168,6 +168,7 @@ class Position(Base):
     execution_mode: Mapped[str] = mapped_column(
         String(10), nullable=False, default="paper"  # paper | live
     )
+    order_id: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
 
     __table_args__ = (
         Index("ix_positions_opened_at", "opened_at"),

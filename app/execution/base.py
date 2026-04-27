@@ -29,7 +29,8 @@ class Position:
     closed_at: datetime | None = None
     exit_price: Decimal | None = None
     realized_pnl_usd: Decimal | None = None
-    exit_reason: str = ""   # tp | sl | timeout | expiry | manual
+    exit_reason: str = ""       # tp | sl | timeout | expiry | manual
+    order_id: str | None = None  # CLOB order ID (live mode only)
 
 
 class BaseExecutor(ABC):

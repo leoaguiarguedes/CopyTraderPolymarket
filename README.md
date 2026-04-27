@@ -2,7 +2,7 @@
 
 Bot automatizado de copytrading para a [Polymarket](https://polymarket.com), focado em **scalping/swing curto**: posições abertas por minutos a poucas horas, nunca seguradas até resolução semanal/mensal do mercado.
 
-> **Status**: Fase 2+ em progresso. Backtest engine implementado. Frontend refatorado com paginação. Próximo passo: Fase 3 — validação histórica completa e live execution.
+> **Status**: Fase 4 implementada. LiveExecutor, KellySizer, CircuitBreaker, Reconciler e Alerter prontos. Para ativar: `EXECUTION_MODE=live` + `WALLET_PRIVATE_KEY` + `WALLET_ADDRESS` no `.env`.
 
 Veja [`PRD.md`](PRD.md), [`spec.md`](spec.md) e [`plan.md`](plan.md) para a visão do produto, o spec técnico e o plano detalhado.
 
@@ -128,14 +128,14 @@ web/                       # Next.js frontend
 - **Fase 0** ✅ Setup técnico
 - **Fase 1** ✅ MVP: discovery + tracking
 - **Fase 2** ✅ Signal engine + paper execution + dashboard web + backtest engine
-- **Fase 3** 🚧 Validação histórica completa + refinamento de estratégias
-- **Fase 4** ⏳ Live execution (após validação completa)
+- **Fase 3** ✅ Validação histórica completa + refinamento de estratégias
+- **Fase 4** ✅ Live execution: LiveExecutor, KellySizer, CircuitBreaker, Reconciler, Alerter
 
 ## Próximo passo
 
-- Executar validação histórica completa usando backtest engine.
-- Refinar thresholds e parâmetros de estratégias baseado em resultados de backtest.
-- Implementar mecanismos de live execution de forma segura.
+- Validar live execution em testnet com capital mínimo (~$10-50).
+- Confirmar reconciliação e circuit breaker funcionando em produção.
+- Monitorar Sharpe e PnL paper vs. live por 30 dias antes de aumentar capital.
 
 ## Mudanças Recentes (Abril 2026)
 
