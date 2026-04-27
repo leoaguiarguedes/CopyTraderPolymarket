@@ -20,7 +20,12 @@ export default function ControlPage() {
   const [days, setDays] = useState(60);
   const [limit, setLimit] = useState(30);
   const [source, setSource] = useState<"orderbook" | "pnl">("orderbook");
-  const [output, setOutput] = useState<{ command: string; exit_code: number; stdout: string; stderr: string } | null>(null);
+  const [output, setOutput] = useState<{ command: string; exit_code: number; stdout: string; stderr: string } | null>(() => {
+    try {
+      const saved = localStorage.getItem("discover_output");
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
   const [discoverRunning, setDiscoverRunning] = useState(false);
   const discoverLogRef = useRef<HTMLPreElement>(null);
 
@@ -126,6 +131,7 @@ export default function ControlPage() {
     try {
       const r = await runDiscoverWallets(days, limit, source);
       setOutput(r);
+      try { localStorage.setItem("discover_output", JSON.stringify(r)); } catch {}
       setMsg(r.exit_code === 0 ? "discover_wallets: OK" : `discover_wallets: exit_code=${r.exit_code}`);
       await refresh();
     } catch (e) { setMsg(`Error: ${String(e)}`); }
@@ -214,6 +220,14 @@ export default function ControlPage() {
             className="px-4 py-2 rounded bg-purple-700 hover:bg-purple-600 text-white text-sm font-medium transition disabled:opacity-50">
             {loading ? "…" : "Executar agora"}
           </button>
+          {output && !discoverRunning && (
+            <button
+              onClick={() => { setOutput(null); try { localStorage.removeItem("discover_output"); } catch {} }}
+              className="px-3 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-sm transition border border-zinc-700"
+            >
+              Limpar log
+            </button>
+          )}
         </div>
 
         {/* Scheduled discovery */}
