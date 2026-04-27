@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import InfoTip from "@/components/InfoTip";
 import { PaginationControls, SortHeader, type SortDirection } from "@/components/TableControls";
-import type { WalletScore } from "@/lib/api";
+import CopyButton from "@/components/CopyButton";
+import { fetchWallets, type WalletScore } from "@/lib/api";
 import { cn, fmtMinutes, fmtPct, fmtUsd, shortAddr } from "@/lib/utils";
+
+const POLL_INTERVAL = 30_000;
 
 type SortKey =
   | "address"
@@ -23,16 +26,35 @@ function compareValues(a: WalletScore, b: WalletScore, key: SortKey) {
   return Number(a[key] ?? 0) - Number(b[key] ?? 0);
 }
 
-export default function TradersPageClient({ initialWallets }: { initialWallets: WalletScore[] }) {
+export default function TradersPageClient() {
+  const [wallets, setWallets] = useState<WalletScore[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
   const [sortKey, setSortKey] = useState<SortKey>("sharpe");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
+  async function load() {
+    try {
+      const data = await fetchWallets(500);
+      setWallets(data);
+      setLastUpdate(new Date());
+    } catch {}
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, POLL_INTERVAL);
+    return () => clearInterval(id);
+  }, []);
+
   const sortedWallets = useMemo(() => {
-    const next = [...initialWallets].sort((a, b) => compareValues(a, b, sortKey));
+    const next = [...wallets].sort((a, b) => compareValues(a, b, sortKey));
     return sortDirection === "asc" ? next : next.reverse();
-  }, [initialWallets, sortDirection, sortKey]);
+  }, [wallets, sortDirection, sortKey]);
 
   const pagedWallets = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -53,7 +75,15 @@ export default function TradersPageClient({ initialWallets }: { initialWallets: 
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold text-zinc-100">Traders rastreados</h1>
-        <span className="text-xs text-zinc-500">{initialWallets.length} carteiras</span>
+        <div className="flex gap-3 items-center text-xs text-zinc-500">
+          <span>{wallets.length} carteiras</span>
+          {lastUpdate && (
+            <span className="text-zinc-600">
+              atualizado {lastUpdate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            </span>
+          )}
+          {loading && <span className="text-zinc-600 italic">atualizando…</span>}
+        </div>
       </div>
 
       <PaginationControls
@@ -61,10 +91,7 @@ export default function TradersPageClient({ initialWallets }: { initialWallets: 
         page={page}
         pageSize={pageSize}
         onPageChange={setPage}
-        onPageSizeChange={(next) => {
-          setPageSize(next);
-          setPage(1);
-        }}
+        onPageSizeChange={(next) => { setPageSize(next); setPage(1); }}
       />
 
       <div className="overflow-x-auto rounded-xl border border-zinc-800">
@@ -77,114 +104,75 @@ export default function TradersPageClient({ initialWallets }: { initialWallets: 
                 </span>
               </th>
               <th className="px-4 py-3 text-left">
-                <SortHeader
-                  label={<span className="inline-flex items-center gap-1">Carteira <InfoTip text="Endereço da carteira rastreada (encurtado)." /></span>}
-                  active={sortKey === "address"}
-                  direction={sortDirection}
-                  onClick={() => toggleSort("address")}
-                />
+                <SortHeader label={<span className="inline-flex items-center gap-1">Carteira <InfoTip text="Endereço da carteira rastreada." /></span>} active={sortKey === "address"} direction={sortDirection} onClick={() => toggleSort("address")} />
               </th>
               <th className="px-4 py-3 text-right">
-                <SortHeader
-                  label={<span className="inline-flex items-center gap-1">Negócios <InfoTip text="Número de trades usados no score mais recente." /></span>}
-                  active={sortKey === "n_trades"}
-                  direction={sortDirection}
-                  onClick={() => toggleSort("n_trades")}
-                  align="right"
-                />
+                <SortHeader label={<span className="inline-flex items-center gap-1">Negócios <InfoTip text="Número de trades usados no score mais recente." /></span>} active={sortKey === "n_trades"} direction={sortDirection} onClick={() => toggleSort("n_trades")} align="right" />
               </th>
               <th className="px-4 py-3 text-right">
-                <SortHeader
-                  label={<span className="inline-flex items-center gap-1">Sharpe <InfoTip text="Sharpe do período do score." /></span>}
-                  active={sortKey === "sharpe"}
-                  direction={sortDirection}
-                  onClick={() => toggleSort("sharpe")}
-                  align="right"
-                />
+                <SortHeader label={<span className="inline-flex items-center gap-1">Sharpe <InfoTip text="Sharpe do período do score." /></span>} active={sortKey === "sharpe"} direction={sortDirection} onClick={() => toggleSort("sharpe")} align="right" />
               </th>
               <th className="px-4 py-3 text-right">
-                <SortHeader
-                  label={<span className="inline-flex items-center gap-1">ROI <InfoTip text="Retorno sobre capital no período do score." /></span>}
-                  active={sortKey === "roi"}
-                  direction={sortDirection}
-                  onClick={() => toggleSort("roi")}
-                  align="right"
-                />
+                <SortHeader label={<span className="inline-flex items-center gap-1">ROI <InfoTip text="Retorno sobre capital no período do score." /></span>} active={sortKey === "roi"} direction={sortDirection} onClick={() => toggleSort("roi")} align="right" />
               </th>
               <th className="px-4 py-3 text-right">
-                <SortHeader
-                  label={<span className="inline-flex items-center gap-1">Taxa de acerto <InfoTip text="Percentual de trades vencedores." /></span>}
-                  active={sortKey === "win_rate"}
-                  direction={sortDirection}
-                  onClick={() => toggleSort("win_rate")}
-                  align="right"
-                />
+                <SortHeader label={<span className="inline-flex items-center gap-1">Taxa de acerto <InfoTip text="Percentual de trades vencedores." /></span>} active={sortKey === "win_rate"} direction={sortDirection} onClick={() => toggleSort("win_rate")} align="right" />
               </th>
               <th className="px-4 py-3 text-right">
-                <SortHeader
-                  label={<span className="inline-flex items-center gap-1">Máx. DD <InfoTip text="Máximo drawdown observado." /></span>}
-                  active={sortKey === "max_drawdown"}
-                  direction={sortDirection}
-                  onClick={() => toggleSort("max_drawdown")}
-                  align="right"
-                />
+                <SortHeader label={<span className="inline-flex items-center gap-1">Máx. DD <InfoTip text="Máximo drawdown observado." /></span>} active={sortKey === "max_drawdown"} direction={sortDirection} onClick={() => toggleSort("max_drawdown")} align="right" />
               </th>
               <th className="px-4 py-3 text-right">
-                <SortHeader
-                  label={<span className="inline-flex items-center gap-1">Tempo médio <InfoTip text="Tempo mediano/médio de holding." /></span>}
-                  active={sortKey === "median_holding_minutes"}
-                  direction={sortDirection}
-                  onClick={() => toggleSort("median_holding_minutes")}
-                  align="right"
-                />
+                <SortHeader label={<span className="inline-flex items-center gap-1">Tempo médio <InfoTip text="Tempo mediano de holding." /></span>} active={sortKey === "median_holding_minutes"} direction={sortDirection} onClick={() => toggleSort("median_holding_minutes")} align="right" />
               </th>
               <th className="px-4 py-3 text-right">
-                <SortHeader
-                  label={<span className="inline-flex items-center gap-1">Volume <InfoTip text="Volume total em USD." /></span>}
-                  active={sortKey === "total_volume_usd"}
-                  direction={sortDirection}
-                  onClick={() => toggleSort("total_volume_usd")}
-                  align="right"
-                />
+                <SortHeader label={<span className="inline-flex items-center gap-1">Volume <InfoTip text="Volume total em USD." /></span>} active={sortKey === "total_volume_usd"} direction={sortDirection} onClick={() => toggleSort("total_volume_usd")} align="right" />
               </th>
               <th className="px-4 py-3 text-right">
-                <SortHeader
-                  label={<span className="inline-flex items-center gap-1">Status <InfoTip text="Se a carteira está ativa no recorte." /></span>}
-                  active={sortKey === "is_active"}
-                  direction={sortDirection}
-                  onClick={() => toggleSort("is_active")}
-                  align="right"
-                />
+                <SortHeader label={<span className="inline-flex items-center gap-1">Status <InfoTip text="Se a carteira está ativa." /></span>} active={sortKey === "is_active"} direction={sortDirection} onClick={() => toggleSort("is_active")} align="right" />
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800 bg-zinc-950">
-            {sortedWallets.length === 0 && (
+            {wallets.length === 0 && !loading && (
               <tr>
                 <td colSpan={10} className="px-4 py-8 text-center text-zinc-500 italic">
                   Nenhuma carteira rastreada ainda. Execute <code className="text-zinc-400">python scripts/discover_wallets.py</code> primeiro.
                 </td>
               </tr>
             )}
+            {loading && wallets.length === 0 && (
+              <tr><td colSpan={10} className="px-4 py-8 text-center text-zinc-500 italic">Carregando carteiras…</td></tr>
+            )}
             {pagedWallets.map((w, index) => (
               <tr key={w.address} className="hover:bg-zinc-900/60 transition">
-                <td className="px-4 py-3 text-zinc-500">{(page - 1) * pageSize + index + 1}</td>
-                <td className="px-4 py-3 font-mono text-xs">
-                  <span className="text-zinc-200" title={w.address}>{shortAddr(w.address)}</span>
+                <td className="px-4 py-3 text-zinc-500 text-xs">{(page - 1) * pageSize + index + 1}</td>
+                <td className="px-4 py-3 text-xs">
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono text-zinc-200" title={w.address}>{shortAddr(w.address)}</span>
+                    <CopyButton text={w.address} />
+                    {w.proxy_address && (
+                      <>
+                        <span className="text-zinc-600 ml-1 text-[10px]">proxy:</span>
+                        <span className="font-mono text-zinc-500" title={w.proxy_address}>{shortAddr(w.proxy_address)}</span>
+                        <CopyButton text={w.proxy_address} />
+                      </>
+                    )}
+                  </div>
+                  {w.label && <div className="text-zinc-500 text-[10px] mt-0.5">{w.label}</div>}
                 </td>
-                <td className="px-4 py-3 text-right text-zinc-300">{w.n_trades ?? "—"}</td>
-                <td className={cn("px-4 py-3 text-right font-semibold", (w.sharpe ?? 0) >= 0.5 ? "text-green-400" : "text-zinc-400")}>
+                <td className="px-4 py-3 text-right text-zinc-300 text-xs">{w.n_trades ?? "—"}</td>
+                <td className={cn("px-4 py-3 text-right font-semibold text-xs", (w.sharpe ?? 0) >= 0.5 ? "text-green-400" : "text-zinc-400")}>
                   {w.sharpe != null ? w.sharpe.toFixed(2) : "—"}
                 </td>
-                <td className={cn("px-4 py-3 text-right font-semibold", (w.roi ?? 0) >= 0 ? "text-green-400" : "text-red-400")}>
+                <td className={cn("px-4 py-3 text-right font-semibold text-xs", (w.roi ?? 0) >= 0 ? "text-green-400" : "text-red-400")}>
                   {w.roi != null ? fmtPct(w.roi) : "—"}
                 </td>
-                <td className="px-4 py-3 text-right text-zinc-300">{w.win_rate != null ? fmtPct(w.win_rate) : "—"}</td>
-                <td className={cn("px-4 py-3 text-right", (w.max_drawdown ?? 0) > 0.3 ? "text-red-400" : "text-zinc-300")}>
+                <td className="px-4 py-3 text-right text-zinc-300 text-xs">{w.win_rate != null ? fmtPct(w.win_rate) : "—"}</td>
+                <td className={cn("px-4 py-3 text-right text-xs", (w.max_drawdown ?? 0) > 0.3 ? "text-red-400" : "text-zinc-300")}>
                   {w.max_drawdown != null ? fmtPct(w.max_drawdown) : "—"}
                 </td>
-                <td className="px-4 py-3 text-right text-zinc-300">{w.median_holding_minutes != null ? fmtMinutes(w.median_holding_minutes) : "—"}</td>
-                <td className="px-4 py-3 text-right text-zinc-300">{w.total_volume_usd != null ? fmtUsd(w.total_volume_usd) : "—"}</td>
+                <td className="px-4 py-3 text-right text-zinc-300 text-xs">{w.median_holding_minutes != null ? fmtMinutes(w.median_holding_minutes) : "—"}</td>
+                <td className="px-4 py-3 text-right text-zinc-300 text-xs">{w.total_volume_usd != null ? fmtUsd(w.total_volume_usd) : "—"}</td>
                 <td className="px-4 py-3 text-right">
                   <span className={cn("px-2 py-0.5 rounded text-xs font-medium", w.is_active ? "bg-green-900/40 text-green-400" : "bg-zinc-800 text-zinc-500")}>
                     {w.is_active ? "ativo" : "rastreado"}

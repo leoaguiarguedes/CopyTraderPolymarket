@@ -208,6 +208,28 @@ export function fetchMarketTags() {
   return get<MarketTagsResponse>("/system/market-tags");
 }
 
+export type EnvStatus = {
+  execution_mode: string;
+  wallet_address: string | null;
+  discord_webhook_url: string | null;
+  wallet_private_key_set: boolean;
+};
+
+export function fetchEnvStatus() {
+  return get<EnvStatus>("/system/env");
+}
+
+export async function updateEnvVars(vars: Record<string, string>) {
+  const url = new URL("/system/env", BASE);
+  const res = await fetch(url.toString(), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ vars }),
+  });
+  if (!res.ok) throw new Error(`API /system/env → ${res.status}`);
+  return res.json() as Promise<EnvStatus>;
+}
+
 export async function updateMarketTags(tracked_tag_ids: number[]) {
   const url = new URL("/system/market-tags", BASE);
   const res = await fetch(url.toString(), {

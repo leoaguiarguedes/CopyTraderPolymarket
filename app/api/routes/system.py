@@ -1,6 +1,8 @@
-"""System status and market-filter management endpoints."""
+"""System status, market-filter management, and env-var update endpoints."""
 from __future__ import annotations
 
+import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +13,8 @@ from pydantic import BaseModel
 
 from app.config import get_settings
 from app.risk.kill_switch import KillSwitch
+
+_ENV_PATH = Path(".env")
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -114,6 +118,108 @@ async def update_market_tags(body: UpdateMarketTagsRequest) -> MarketTagsRespons
     _save_market_filters(data)
 
     return await get_market_tags()
+
+
+# ── /system/env ───────────────────────────────────────────────────────────────
+
+_ALLOWED_ENV_KEYS = {
+    "EXECUTION_MODE",
+    "WALLET_ADDRESS",
+    "DISCORD_WEBHOOK_URL",
+    "WALLET_PRIVATE_KEY",
+}
+
+_SENSITIVE_KEYS = {"WALLET_PRIVATE_KEY"}
+
+
+class EnvUpdateRequest(BaseModel):
+    vars: dict[str, str]
+
+
+class EnvStatus(BaseModel):
+    execution_mode: str
+    wallet_address: str | None
+    discord_webhook_url: str | None
+    wallet_private_key_set: bool
+
+
+@router.get("/env", response_model=EnvStatus)
+async def get_env_status() -> EnvStatus:
+    """Return current runtime-relevant env var values (private key is never returned)."""
+    current = _read_env_file()
+    settings = get_settings()
+    return EnvStatus(
+        execution_mode=current.get("EXECUTION_MODE", settings.execution_mode.value),
+        wallet_address=current.get("WALLET_ADDRESS") or None,
+        discord_webhook_url=current.get("DISCORD_WEBHOOK_URL") or None,
+        wallet_private_key_set=bool(current.get("WALLET_PRIVATE_KEY")),
+    )
+
+
+@router.patch("/env", response_model=EnvStatus)
+async def update_env(body: EnvUpdateRequest) -> EnvStatus:
+    """Write allowed env vars to the .env file. Sensitive values are write-only."""
+    unknown = set(body.vars) - _ALLOWED_ENV_KEYS
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"Chaves não permitidas: {sorted(unknown)}")
+
+    if "EXECUTION_MODE" in body.vars:
+        val = body.vars["EXECUTION_MODE"].lower()
+        if val not in ("live", "paper"):
+            raise HTTPException(status_code=422, detail="EXECUTION_MODE deve ser 'live' ou 'paper'")
+        body.vars["EXECUTION_MODE"] = val
+
+    current = _read_env_file()
+    for k, v in body.vars.items():
+        if v.strip() == "" and k in _SENSITIVE_KEYS:
+            continue  # don't overwrite sensitive key with blank
+        current[k] = v
+
+    _write_env_file(current)
+    return await get_env_status()
+
+
+def _read_env_file() -> dict[str, str]:
+    """Read .env file into a dict, preserving values."""
+    result: dict[str, str] = {}
+    if not _ENV_PATH.exists():
+        return result
+    for line in _ENV_PATH.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        result[key.strip()] = value.strip().strip('"').strip("'")
+    return result
+
+
+def _write_env_file(data: dict[str, str]) -> None:
+    """Update .env file, preserving comments and unknown lines, updating known keys."""
+    if not _ENV_PATH.exists():
+        lines = [f"{k}={v}" for k, v in data.items()]
+        _ENV_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return
+
+    original = _ENV_PATH.read_text(encoding="utf-8").splitlines()
+    updated_keys: set[str] = set()
+    new_lines: list[str] = []
+
+    for line in original:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" in stripped:
+            key = stripped.split("=", 1)[0].strip()
+            if key in data:
+                new_lines.append(f"{key}={data[key]}")
+                updated_keys.add(key)
+                continue
+        new_lines.append(line)
+
+    # Append any keys not already in file
+    for key, value in data.items():
+        if key not in updated_keys:
+            new_lines.append(f"{key}={value}")
+
+    _ENV_PATH.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────

@@ -1,18 +1,48 @@
-import { Suspense } from "react";
+"use client";
+
+import { useEffect, useState } from "react";
 import { fetchPnLSummary, fetchEquityCurve, fetchSystemStatus } from "@/lib/api";
+import type { PnLSummary, EquityCurve, SystemStatus } from "@/lib/api";
 import StatCard from "@/components/StatCard";
 import EquityCurveChart from "@/components/EquityCurve";
 import SignalFeed from "@/components/SignalFeed";
 import { fmtUsd, fmtPct } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
+const POLL_INTERVAL = 30_000;
 
-async function DashboardContent() {
-  const [summary, curve, sys] = await Promise.all([
-    fetchPnLSummary("all"),
-    fetchEquityCurve("30d", "1h"),
-    fetchSystemStatus().catch(() => null),
-  ]);
+export default function DashboardPage() {
+  const [summary, setSummary] = useState<PnLSummary | null>(null);
+  const [curve, setCurve] = useState<EquityCurve | null>(null);
+  const [sys, setSys] = useState<SystemStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    try {
+      const [s, c, st] = await Promise.all([
+        fetchPnLSummary("all"),
+        fetchEquityCurve("30d", "1h"),
+        fetchSystemStatus().catch(() => null),
+      ]);
+      setSummary(s);
+      setCurve(c);
+      setSys(st);
+    } catch {}
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, POLL_INTERVAL);
+    return () => clearInterval(id);
+  }, []);
+
+  if (loading) {
+    return <div className="text-zinc-500 text-sm italic">Carregando painel…</div>;
+  }
+
+  if (!summary || !curve) {
+    return <div className="text-red-400 text-sm">Erro ao carregar dados. Verifique se o backend está online.</div>;
+  }
 
   const pnlPositive = summary.total_pnl_usd >= 0;
   const isLive = sys?.execution_mode === "live";
@@ -47,6 +77,9 @@ async function DashboardContent() {
               Saldo USDC: <span className="text-white font-bold">{fmtUsd(sys.usdc_balance)}</span>
             </span>
           )}
+          <span className="text-[11px] text-zinc-500 ml-auto pl-4">
+            Atualiza a cada 30s
+          </span>
         </div>
       )}
 
@@ -123,17 +156,5 @@ async function DashboardContent() {
         <SignalFeed />
       </div>
     </div>
-  );
-}
-
-export default function DashboardPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="text-zinc-500 text-sm italic">Carregando painel…</div>
-      }
-    >
-      <DashboardContent />
-    </Suspense>
   );
 }
