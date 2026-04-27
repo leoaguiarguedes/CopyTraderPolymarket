@@ -38,7 +38,7 @@ export default function TradersPageClient() {
 
   async function load() {
     try {
-      const data = await fetchWallets(500);
+      const data = await fetchWallets(200);
       setWallets(data);
       setLastUpdate(new Date());
     } catch {}
