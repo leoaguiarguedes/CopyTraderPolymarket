@@ -20,12 +20,15 @@ export default function ControlPage() {
   const [days, setDays] = useState(60);
   const [limit, setLimit] = useState(30);
   const [source, setSource] = useState<"orderbook" | "pnl">("orderbook");
-  const [output, setOutput] = useState<{ command: string; exit_code: number; stdout: string; stderr: string } | null>(() => {
+  const [output, setOutput] = useState<{ command: string; exit_code: number; stdout: string; stderr: string } | null>(null);
+
+  // Restore last output from localStorage after mount (localStorage not available during SSR)
+  useEffect(() => {
     try {
       const saved = localStorage.getItem("discover_output");
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
+      if (saved) setOutput(JSON.parse(saved));
+    } catch {}
+  }, []);
   const [discoverRunning, setDiscoverRunning] = useState(false);
   const discoverLogRef = useRef<HTMLPreElement>(null);
 
