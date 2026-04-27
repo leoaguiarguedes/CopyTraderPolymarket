@@ -1,10 +1,11 @@
 """GET /wallets — list tracked wallets with latest scores."""
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.storage.db import get_session
@@ -26,6 +27,29 @@ async def list_wallets(
     result = await session.execute(q.limit(limit))
     wallets = result.scalars().all()
 
+    # Batch-fetch top market categories for all wallets in one query
+    addresses = [w.address for w in wallets]
+    top_cats: dict[str, list[str]] = defaultdict(list)
+    if addresses:
+        cat_q = (
+            select(
+                orm.Trade.wallet_address,
+                orm.Market.category,
+                func.count(orm.Trade.id).label("cnt"),
+            )
+            .join(orm.Market, orm.Trade.market_id == orm.Market.condition_id)
+            .where(orm.Trade.wallet_address.in_(addresses))
+            .where(orm.Market.category.isnot(None))
+            .group_by(orm.Trade.wallet_address, orm.Market.category)
+        )
+        cat_result = await session.execute(cat_q)
+        grouped: dict[str, list[tuple[str, int]]] = defaultdict(list)
+        for row in cat_result.all():
+            grouped[row.wallet_address].append((row.category, row.cnt))
+        for addr, cats in grouped.items():
+            cats.sort(key=lambda x: x[1], reverse=True)
+            top_cats[addr] = [c[0] for c in cats[:3]]
+
     rows: list[dict[str, Any]] = []
     for w in wallets:
         # get latest score (30d window preferred, else any)
@@ -43,6 +67,7 @@ async def list_wallets(
             "proxy_address": w.proxy_address,
             "label": w.label,
             "is_tracked": w.is_tracked,
+            "top_categories": top_cats.get(w.address, []),
         }
         if score:
             row.update(

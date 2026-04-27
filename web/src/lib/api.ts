@@ -73,6 +73,7 @@ export const PositionSchema = z.object({
   signal_id: z.string(),
   strategy: z.string(),
   market_id: z.string(),
+  market_category: z.string().nullable().optional(),
   side: z.string(),
   entry_price: z.number(),
   size_usd: z.number(),
@@ -95,6 +96,7 @@ export const SignalSchema = z.object({
   strategy: z.string(),
   market_id: z.string(),
   market_question: z.string(),
+  market_category: z.string().nullable().optional(),
   side: z.string(),
   confidence: z.number(),
   entry_price: z.number(),
@@ -127,6 +129,7 @@ export const WalletScoreSchema = z.object({
   total_volume_usd: z.number().optional(),
   is_active: z.boolean().optional(),
   last_seen: z.string().nullable().optional(),
+  top_categories: z.array(z.string()).optional(),
 });
 export type WalletScore = z.infer<typeof WalletScoreSchema>;
 
@@ -467,4 +470,15 @@ export function startWalkForward(req: WalkForwardRequest) {
 
 export function fetchWalkForward(run_id: string) {
   return get<WalkForwardResult>(`/backtest/walk-forward/${run_id}`);
+}
+
+// ── Admin reset ───────────────────────────────────────────────────────────────
+
+export type ResetEntity = "trades" | "wallets" | "signals" | "backtest" | "all";
+
+export async function resetData(entity: ResetEntity) {
+  const url = new URL(`/admin/reset?entity=${entity}`, BASE);
+  const res = await fetch(url.toString(), { method: "DELETE" });
+  if (!res.ok) throw new Error(`API /admin/reset → ${res.status} ${res.statusText}`);
+  return res.json() as Promise<{ reset: string; deleted: Record<string, number> }>;
 }

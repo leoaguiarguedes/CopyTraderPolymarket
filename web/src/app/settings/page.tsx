@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { toggleKillSwitch, fetchMarketTags, updateMarketTags, fetchEnvStatus, updateEnvVars } from "@/lib/api";
-import type { MarketTag, EnvStatus } from "@/lib/api";
+import { toggleKillSwitch, fetchMarketTags, updateMarketTags, fetchEnvStatus, updateEnvVars, resetData } from "@/lib/api";
+import type { MarketTag, EnvStatus, ResetEntity } from "@/lib/api";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -9,6 +9,28 @@ const API_URL =
 export default function SettingsPage() {
   const [ksLoading, setKsLoading] = useState(false);
   const [ksMsg, setKsMsg] = useState<string | null>(null);
+
+  // ── Reset / danger zone ─────────────────────────────────────────────────────
+  const [resetConfirm, setResetConfirm] = useState<ResetEntity | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
+
+  async function handleReset(entity: ResetEntity) {
+    setResetLoading(true);
+    setResetMsg(null);
+    setResetConfirm(null);
+    try {
+      const r = await resetData(entity);
+      const counts = Object.entries(r.deleted)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(", ");
+      setResetMsg(`Resetado "${entity}" — ${counts || "nenhum registro apagado"}.`);
+    } catch (e) {
+      setResetMsg(`Erro: ${e}`);
+    } finally {
+      setResetLoading(false);
+    }
+  }
 
   const [tags, setTags] = useState<MarketTag[]>([]);
   const [trackedIds, setTrackedIds] = useState<number[]>([]);
@@ -362,6 +384,80 @@ export default function SettingsPage() {
           </p>
         </div>
       </div>
+
+      {/* Zona de perigo — reset */}
+      <div className="bg-zinc-900 border border-red-900/40 rounded-xl p-5">
+        <h2 className="text-sm font-semibold text-red-400 mb-1">Zona de perigo</h2>
+        <p className="text-xs text-zinc-500 mb-4">
+          Apaga permanentemente os dados do banco. Não há desfazer.
+        </p>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {(
+            [
+              { entity: "trades", label: "Trades", desc: "Histórico de trades on-chain" },
+              { entity: "wallets", label: "Carteiras", desc: "Carteiras, scores e trades" },
+              { entity: "signals", label: "Sinais", desc: "Sinais e posições" },
+              { entity: "backtest", label: "Backtest", desc: "Todas as execuções de backtest" },
+            ] as { entity: ResetEntity; label: string; desc: string }[]
+          ).map(({ entity, label, desc }) => (
+            <button
+              key={entity}
+              onClick={() => setResetConfirm(entity)}
+              disabled={resetLoading}
+              className="flex flex-col gap-0.5 px-3 py-2 rounded-lg border border-zinc-700 hover:border-red-700 bg-zinc-950 text-left transition disabled:opacity-50"
+            >
+              <span className="text-xs font-semibold text-zinc-300">Resetar {label}</span>
+              <span className="text-[10px] text-zinc-500">{desc}</span>
+            </button>
+          ))}
+
+          <button
+            onClick={() => setResetConfirm("all")}
+            disabled={resetLoading}
+            className="flex flex-col gap-0.5 px-3 py-2 rounded-lg border border-red-800 hover:border-red-600 bg-red-950/20 text-left transition disabled:opacity-50 col-span-2 sm:col-span-1"
+          >
+            <span className="text-xs font-semibold text-red-400">Resetar tudo</span>
+            <span className="text-[10px] text-zinc-500">Apaga todos os dados acima</span>
+          </button>
+        </div>
+
+        {resetMsg && (
+          <p className="mt-3 text-xs text-zinc-400 bg-zinc-800 rounded px-3 py-2">{resetMsg}</p>
+        )}
+      </div>
+
+      {/* Confirmation modal */}
+      {resetConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-red-800 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="text-sm font-bold text-red-400 mb-2">Confirmar reset</h3>
+            <p className="text-xs text-zinc-400 mb-5">
+              Você está prestes a apagar permanentemente{" "}
+              <span className="text-zinc-200 font-semibold">
+                {resetConfirm === "all" ? "todos os dados" : `"${resetConfirm}"`}
+              </span>
+              . Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleReset(resetConfirm)}
+                disabled={resetLoading}
+                className="flex-1 px-4 py-2 rounded bg-red-700 hover:bg-red-600 text-white text-sm font-medium transition disabled:opacity-50"
+              >
+                {resetLoading ? "Apagando…" : "Confirmar"}
+              </button>
+              <button
+                onClick={() => setResetConfirm(null)}
+                disabled={resetLoading}
+                className="flex-1 px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Workers status */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">

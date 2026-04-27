@@ -48,6 +48,9 @@ function SignalDetailModal({ signal, onClose }: { signal: Signal; onClose: () =>
         <DetailRow label="Estratégia" value={signal.strategy} />
         <DetailRow label="Mercado" value={signal.market_question || signal.market_id} />
         <DetailRow label="Market ID" value={<span className="flex items-center gap-1">{signal.market_id}<CopyButton text={signal.market_id} /></span>} mono />
+        {signal.market_category && (
+          <DetailRow label="Categoria" value={<span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-xs">{signal.market_category}</span>} />
+        )}
         <DetailRow label="Lado" value={<SideBadge side={signal.side} />} />
         <DetailRow label="Confiança" value={fmtPct(signal.confidence)} />
         <DetailRow label="Preço de entrada" value={signal.entry_price.toFixed(6)} mono />

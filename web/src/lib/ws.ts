@@ -13,6 +13,7 @@ export type LiveEvent = {
   position_id: string;
   strategy: string;
   market_id: string;
+  market_category?: string | null;
   side: string;
   entry_price: string;
   size_usd: string;

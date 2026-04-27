@@ -21,7 +21,12 @@ async def list_positions(
     db: AsyncSession = Depends(get_db),
 ):
     """List positions with age and forced-exit countdown."""
-    q = select(orm.Position).order_by(orm.Position.opened_at.desc()).limit(limit)
+    q = (
+        select(orm.Position, orm.Market.category.label("market_category"))
+        .outerjoin(orm.Market, orm.Position.market_id == orm.Market.condition_id)
+        .order_by(orm.Position.opened_at.desc())
+        .limit(limit)
+    )
 
     if status == "open":
         q = q.where(orm.Position.closed_at.is_(None))
@@ -32,13 +37,13 @@ async def list_positions(
         q = q.where(orm.Position.strategy == strategy)
 
     result = await db.execute(q)
-    positions = result.scalars().all()
+    rows = result.all()
 
     now = datetime.now(tz=timezone.utc)
-    return [_position_to_dict(p, now) for p in positions]
+    return [_position_to_dict(row[0], now, row[1]) for row in rows]
 
 
-def _position_to_dict(p: orm.Position, now: datetime) -> dict:
+def _position_to_dict(p: orm.Position, now: datetime, market_category: str | None = None) -> dict:
     opened = p.opened_at
     age_min = (now - opened).total_seconds() / 60 if opened else 0.0
     time_to_force_exit = max(0.0, p.max_holding_minutes - age_min) if not p.closed_at else None
@@ -48,6 +53,7 @@ def _position_to_dict(p: orm.Position, now: datetime) -> dict:
         "signal_id": p.signal_id,
         "strategy": p.strategy,
         "market_id": p.market_id,
+        "market_category": market_category,
         "side": p.side,
         "entry_price": float(p.entry_price),
         "size_usd": float(p.size_usd),

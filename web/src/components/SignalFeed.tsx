@@ -11,6 +11,7 @@ function positionToEvent(position: {
   position_id: string;
   strategy: string;
   market_id: string;
+  market_category?: string | null;
   side: string;
   entry_price: number;
   size_usd: number;
@@ -28,6 +29,7 @@ function positionToEvent(position: {
     position_id: position.position_id,
     strategy: position.strategy,
     market_id: position.market_id,
+    market_category: position.market_category,
     side: position.side,
     entry_price: String(position.entry_price),
     size_usd: String(position.size_usd),
@@ -57,6 +59,9 @@ function EventDetailModal({ evt, onClose }: { evt: LiveEvent; onClose: () => voi
             <CopyButton text={evt.market_id} />
           </span>
         } mono />
+        {evt.market_category && (
+          <DetailRow label="Categoria" value={<span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-xs">{evt.market_category}</span>} />
+        )}
         <DetailRow label="Market ID completo" value={
           <span className="flex items-center gap-1 break-all">
             {evt.market_id}

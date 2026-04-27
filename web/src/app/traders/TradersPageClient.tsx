@@ -130,18 +130,21 @@ export default function TradersPageClient() {
               <th className="px-4 py-3 text-right">
                 <SortHeader label={<span className="inline-flex items-center gap-1">Status <InfoTip text="Se a carteira está ativa." /></span>} active={sortKey === "is_active"} direction={sortDirection} onClick={() => toggleSort("is_active")} align="right" />
               </th>
+              <th className="px-4 py-3 text-left">
+                <span className="inline-flex items-center gap-1">Categorias <InfoTip text="Top 3 categorias de mercado negociadas pela carteira." /></span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800 bg-zinc-950">
             {wallets.length === 0 && !loading && (
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-zinc-500 italic">
+                <td colSpan={11} className="px-4 py-8 text-center text-zinc-500 italic">
                   Nenhuma carteira rastreada ainda. Execute <code className="text-zinc-400">python scripts/discover_wallets.py</code> primeiro.
                 </td>
               </tr>
             )}
             {loading && wallets.length === 0 && (
-              <tr><td colSpan={10} className="px-4 py-8 text-center text-zinc-500 italic">Carregando carteiras…</td></tr>
+              <tr><td colSpan={11} className="px-4 py-8 text-center text-zinc-500 italic">Carregando carteiras…</td></tr>
             )}
             {pagedWallets.map((w, index) => (
               <tr key={w.address} className="hover:bg-zinc-900/60 transition">
@@ -177,6 +180,13 @@ export default function TradersPageClient() {
                   <span className={cn("px-2 py-0.5 rounded text-xs font-medium", w.is_active ? "bg-green-900/40 text-green-400" : "bg-zinc-800 text-zinc-500")}>
                     {w.is_active ? "ativo" : "rastreado"}
                   </span>
+                </td>
+                <td className="px-4 py-3 text-xs">
+                  <div className="flex flex-wrap gap-1">
+                    {(w.top_categories ?? []).map((cat) => (
+                      <span key={cat} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px]">{cat}</span>
+                    ))}
+                  </div>
                 </td>
               </tr>
             ))}
