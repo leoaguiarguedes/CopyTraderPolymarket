@@ -48,11 +48,14 @@ class PolymarketRestClient:
         active: bool = True,
         limit: int = 100,
         offset: int = 0,
+        tag_id: int | None = None,
     ) -> list[Market]:
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         if active:
             params["active"] = "true"
             params["closed"] = "false"
+        if tag_id is not None:
+            params["tag_id"] = tag_id
         r = await self._gamma.get("/markets", params=params)
         r.raise_for_status()
         payload = r.json()
@@ -68,18 +71,43 @@ class PolymarketRestClient:
         r.raise_for_status()
         return self._parse_market(r.json())
 
-    async def get_all_active_markets(self, max_markets: int = 2000) -> list[Market]:
-        """Paginate through active markets up to max_markets (default 2000)."""
+    async def get_all_active_markets(
+        self,
+        max_markets: int = 2000,
+        tag_ids: list[int] | None = None,
+    ) -> list[Market]:
+        """Paginate through active markets, optionally filtering by tag_id list (OR logic)."""
+        if not tag_ids:
+            # No filter — fetch all
+            return await self._paginate_markets(max_markets, tag_id=None)
+
+        # Fetch each tag separately and merge (Gamma API supports one tag_id at a time)
+        seen: set[str] = set()
+        merged: list[Market] = []
+        for tid in tag_ids:
+            page_markets = await self._paginate_markets(max_markets, tag_id=tid)
+            for m in page_markets:
+                if m.condition_id not in seen:
+                    seen.add(m.condition_id)
+                    merged.append(m)
+                    if len(merged) >= max_markets:
+                        break
+            if len(merged) >= max_markets:
+                break
+
+        log.info("rest.markets_fetched", total=len(merged), tags=tag_ids)
+        return merged
+
+    async def _paginate_markets(self, max_markets: int, tag_id: int | None) -> list[Market]:
         markets: list[Market] = []
         offset = 0
         limit = 100
         while len(markets) < max_markets:
-            page = await self.get_markets(active=True, limit=limit, offset=offset)
+            page = await self.get_markets(active=True, limit=limit, offset=offset, tag_id=tag_id)
             markets.extend(page)
             if len(page) < limit:
                 break
             offset += limit
-        log.info("rest.markets_fetched", total=len(markets))
         return markets[:max_markets]
 
     # ── Proxy wallet ──────────────────────────────────────────────────────
@@ -174,6 +202,14 @@ class PolymarketRestClient:
             elif t:
                 token_ids.append(str(t))
 
+        # Parse tags from Gamma API: list of {id, label, slug} objects
+        raw_tags = raw.get("tags") or []
+        tags = [
+            {"id": t.get("id"), "label": t.get("label", ""), "slug": t.get("slug", "")}
+            for t in raw_tags
+            if isinstance(t, dict) and t.get("id") is not None
+        ]
+
         return Market(
             condition_id=raw.get("conditionId") or raw.get("condition_id", ""),
             question=raw.get("question", ""),
@@ -186,6 +222,7 @@ class PolymarketRestClient:
             volume_24h_usd=Decimal(str(raw["volume24hr"])) if raw.get("volume24hr") else None,
             liquidity_usd=Decimal(str(raw["liquidity"])) if raw.get("liquidity") else None,
             token_ids=token_ids,
+            tags=tags,
         )
 
     def _parse_trade(self, raw: dict[str, Any]) -> TradeEvent | None:

@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { fetchPnLSummary, fetchEquityCurve } from "@/lib/api";
+import { fetchPnLSummary, fetchEquityCurve, fetchSystemStatus } from "@/lib/api";
 import StatCard from "@/components/StatCard";
 import EquityCurveChart from "@/components/EquityCurve";
 import SignalFeed from "@/components/SignalFeed";
@@ -8,15 +8,48 @@ import { fmtUsd, fmtPct } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 async function DashboardContent() {
-  const [summary, curve] = await Promise.all([
+  const [summary, curve, sys] = await Promise.all([
     fetchPnLSummary("all"),
     fetchEquityCurve("30d", "1h"),
+    fetchSystemStatus().catch(() => null),
   ]);
 
   const pnlPositive = summary.total_pnl_usd >= 0;
+  const isLive = sys?.execution_mode === "live";
+  const cbConsecutive = sys?.circuit_breaker_consecutive ?? 0;
+  const cbMax = sys?.circuit_breaker_max ?? 3;
+  const cbRatio = cbMax > 0 ? cbConsecutive / cbMax : 0;
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Execution mode banner */}
+      {sys && (
+        <div
+          className={`flex items-center justify-between rounded-xl px-4 py-2.5 text-sm font-medium border ${
+            isLive
+              ? "bg-red-950/60 border-red-700/60 text-red-300"
+              : "bg-zinc-900 border-zinc-700 text-zinc-400"
+          }`}
+        >
+          <span>
+            Modo de execução:{" "}
+            <span className={`font-bold ${isLive ? "text-red-400 uppercase" : "text-zinc-300"}`}>
+              {isLive ? "🔴 LIVE" : "🟡 Paper Trading"}
+            </span>
+          </span>
+          {sys.kill_switch_active && (
+            <span className="text-red-400 font-semibold animate-pulse">
+              ⛔ Kill Switch Ativo
+            </span>
+          )}
+          {isLive && sys.usdc_balance !== null && (
+            <span className="text-zinc-300 font-mono">
+              Saldo USDC: <span className="text-white font-bold">{fmtUsd(sys.usdc_balance)}</span>
+            </span>
+          )}
+        </div>
+      )}
+
       {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard
@@ -43,13 +76,16 @@ async function DashboardContent() {
           sub={fmtUsd(summary.open_exposure_usd) + " em exposição"}
         />
         <StatCard
-          label="Volume"
-          value={fmtUsd(summary.total_volume_usd)}
-          sub="Posições fechadas"
+          label={isLive ? "Saldo USDC" : "Capital simulado"}
+          value={isLive && sys?.usdc_balance !== null ? fmtUsd(sys!.usdc_balance!) : fmtUsd(sys?.capital_usd ?? 0)}
+          sub={isLive ? "Disponível na carteira" : "Inicial configurado"}
         />
         <StatCard
-          label="Negócios fechados"
-          value={String(summary.n_closed_positions)}
+          label="Circuit Breaker"
+          value={`${cbConsecutive}/${cbMax}`}
+          sub={cbConsecutive === 0 ? "Sem perdas consecutivas" : `${cbConsecutive} perda(s) seguida(s)`}
+          negative={cbRatio >= 0.67}
+          positive={cbConsecutive === 0}
         />
       </div>
 

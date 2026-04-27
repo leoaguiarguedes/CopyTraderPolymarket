@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from app.api.routes import backtest, control, health, pnl, positions, signals, trades, wallets
+from app.api.routes import backtest, control, health, pnl, positions, signals, system, trades, wallets
 from app.config import get_settings
 from app.risk.kill_switch import KillSwitch
 from app.utils.logger import configure_logging, get_logger
@@ -58,6 +58,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(system.router)
 app.include_router(control.router)
 app.include_router(backtest.router)
 app.include_router(wallets.router)

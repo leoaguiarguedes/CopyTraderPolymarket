@@ -133,6 +133,31 @@ export type WalletScore = z.infer<typeof WalletScoreSchema>;
 export const KillSwitchSchema = z.object({ kill_switch: z.boolean() });
 export type KillSwitch = z.infer<typeof KillSwitchSchema>;
 
+export const SystemStatusSchema = z.object({
+  execution_mode: z.string(),
+  kill_switch_active: z.boolean(),
+  circuit_breaker_consecutive: z.number(),
+  circuit_breaker_max: z.number(),
+  usdc_balance: z.number().nullable(),
+  capital_usd: z.number(),
+  tracked_tag_ids: z.array(z.number()),
+});
+export type SystemStatus = z.infer<typeof SystemStatusSchema>;
+
+export const MarketTagSchema = z.object({
+  id: z.number(),
+  label: z.string(),
+  slug: z.string(),
+  description: z.string(),
+  tracked: z.boolean(),
+});
+export const MarketTagsResponseSchema = z.object({
+  tags: z.array(MarketTagSchema),
+  tracked_tag_ids: z.array(z.number()),
+});
+export type MarketTag = z.infer<typeof MarketTagSchema>;
+export type MarketTagsResponse = z.infer<typeof MarketTagsResponseSchema>;
+
 // ── API functions ─────────────────────────────────────────────────────────────
 
 export function fetchPnLSummary(range = "all") {
@@ -173,6 +198,25 @@ export function toggleKillSwitch(active: boolean) {
 
 export function fetchHealth() {
   return get<{ status: string }>("/health");
+}
+
+export function fetchSystemStatus() {
+  return get<SystemStatus>("/system/status");
+}
+
+export function fetchMarketTags() {
+  return get<MarketTagsResponse>("/system/market-tags");
+}
+
+export async function updateMarketTags(tracked_tag_ids: number[]) {
+  const url = new URL("/system/market-tags", BASE);
+  const res = await fetch(url.toString(), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tracked_tag_ids }),
+  });
+  if (!res.ok) throw new Error(`API /system/market-tags → ${res.status}`);
+  return res.json() as Promise<MarketTagsResponse>;
 }
 
 // ── Control ───────────────────────────────────────────────────────────────────

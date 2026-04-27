@@ -26,6 +26,7 @@ import yaml
 import redis.asyncio as aioredis
 
 from app.config import get_settings
+from app.data.polymarket_rest import PolymarketRestClient
 from app.data.subgraph_client import SubgraphClient
 from app.utils.logger import configure_logging, get_logger
 
@@ -36,6 +37,7 @@ DEDUP_TTL = 3600            # seconds to keep seen tx hashes in Redis
 DEDUP_KEY = "collector:seen_txhash"
 WALLETS_PATH = "config/tracked_wallets.yaml"
 LOOKBACK_MINUTES = 60       # fetch fills from the last N minutes each poll
+MARKET_FILTERS_PATH = "config/market_filters.yaml"
 
 log = get_logger(__name__)
 
@@ -50,6 +52,31 @@ def _load_wallet_addresses(path: str) -> list[str]:
         return []
 
 
+def _load_tracked_tag_ids() -> list[int]:
+    """Load market category tag IDs from config/market_filters.yaml. Empty = all markets."""
+    try:
+        data = yaml.safe_load(open(MARKET_FILTERS_PATH))
+        return [int(t) for t in (data.get("tracked_tag_ids") or [])]
+    except Exception as exc:
+        log.warning("collector.market_filters_load_failed", error=str(exc))
+        return []
+
+
+_MARKET_REFRESH_INTERVAL = 300.0  # refresh tracked market asset_ids every 5 min
+
+
+async def _build_tracked_asset_ids(rest: PolymarketRestClient, tag_ids: list[int]) -> set[str]:
+    """Fetch all markets for the given tag IDs and return their token IDs as a set."""
+    if not tag_ids:
+        return set()
+    markets = await rest.get_all_active_markets(max_markets=5000, tag_ids=tag_ids)
+    asset_ids: set[str] = set()
+    for m in markets:
+        asset_ids.update(m.token_ids)
+    log.info("collector.tracked_asset_ids_refreshed", count=len(asset_ids), tags=tag_ids)
+    return asset_ids
+
+
 async def run() -> None:
     configure_logging()
     settings = get_settings()
@@ -57,6 +84,7 @@ async def run() -> None:
 
     redis_client = aioredis.from_url(settings.redis_url, decode_responses=False)
     subgraph = SubgraphClient(settings)
+    rest = PolymarketRestClient(settings)
 
     shutdown = asyncio.Event()
 
@@ -71,6 +99,9 @@ async def run() -> None:
     last_wallets_reload = 0.0
     WALLET_RELOAD_INTERVAL = 60.0
 
+    tracked_asset_ids: set[str] = set()
+    last_market_refresh = 0.0
+
     log.info("collector.poll_mode", interval_s=POLL_INTERVAL)
 
     try:
@@ -82,6 +113,18 @@ async def run() -> None:
                 wallets = _load_wallet_addresses(WALLETS_PATH)
                 last_wallets_reload = now
                 log.info("collector.wallets_loaded", count=len(wallets))
+
+            # Refresh tracked market asset IDs (category filter)
+            if now - last_market_refresh >= _MARKET_REFRESH_INTERVAL:
+                tag_ids = _load_tracked_tag_ids()
+                if tag_ids:
+                    try:
+                        tracked_asset_ids = await _build_tracked_asset_ids(rest, tag_ids)
+                    except Exception as exc:
+                        log.warning("collector.market_refresh_failed", error=str(exc)[:80])
+                else:
+                    tracked_asset_ids = set()  # empty = no filter
+                last_market_refresh = now
 
             if not wallets:
                 await asyncio.sleep(POLL_INTERVAL)
@@ -110,6 +153,12 @@ async def run() -> None:
                             continue
                         await redis_client.setex(key, DEDUP_TTL, b"1")
 
+                        # Market category filter: skip if asset not in tracked set
+                        if tracked_asset_ids:
+                            fill_asset = fill.get("makerAssetId", "") or fill.get("takerAssetId", "")
+                            if fill_asset and fill_asset not in tracked_asset_ids:
+                                continue
+
                         # Publish to stream
                         fields = _fill_to_stream_fields(fill, wallet)
                         await redis_client.xadd(
@@ -135,6 +184,7 @@ async def run() -> None:
 
     finally:
         await redis_client.aclose()
+        await rest.aclose()
         log.info("collector.stopped")
 
 

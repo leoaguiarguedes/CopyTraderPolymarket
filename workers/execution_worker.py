@@ -91,6 +91,13 @@ class ExecutionWorker:
                 position.exit_reason,
                 float(position.realized_pnl_usd or 0),
             )
+            # Persist circuit breaker state so API can read it
+            assert self._r is not None
+            await self._r.set(
+                "copytrader:circuit_breaker:consecutive",
+                circuit.consecutive_losses,
+                ex=86400,
+            )
 
         exit_mgr = ExitManager(
             executor=executor,
@@ -210,6 +217,17 @@ class ExecutionWorker:
                 size_pct=round(kelly_pct, 4),
                 kelly_samples=kelly.sample_count,
             )
+
+        # In live mode: refresh and cache USDC balance before each trade
+        if self._s.execution_mode == ExecutionMode.live:
+            from app.execution.live_executor import LiveExecutor
+            if isinstance(executor, LiveExecutor):
+                try:
+                    balance = await executor.get_usdc_balance()
+                    assert self._r is not None
+                    await self._r.set("copytrader:live:usdc_balance", balance, ex=300)
+                except Exception:
+                    pass
 
         # Open position
         try:

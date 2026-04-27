@@ -63,6 +63,8 @@ class Market:
     liquidity_usd: Decimal | None = None
     # token ids: index 0 = YES, 1 = NO
     token_ids: list[str] = field(default_factory=list)
+    # Gamma API tags (id + label) — used for category filtering
+    tags: list[dict] = field(default_factory=list)
 
     def time_to_resolution_minutes(self, now: datetime) -> float | None:
         if self.end_date is None:
