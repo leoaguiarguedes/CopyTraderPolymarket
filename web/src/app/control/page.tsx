@@ -21,6 +21,8 @@ export default function ControlPage() {
   const [limit, setLimit] = useState(30);
   const [source, setSource] = useState<"orderbook" | "pnl">("orderbook");
   const [output, setOutput] = useState<{ command: string; exit_code: number; stdout: string; stderr: string } | null>(null);
+  const [discoverRunning, setDiscoverRunning] = useState(false);
+  const discoverLogRef = useRef<HTMLPreElement>(null);
 
   // Scheduled discover
   const [schedEnabled, setSchedEnabled] = useState(false);
@@ -117,14 +119,17 @@ export default function ControlPage() {
   }
 
   async function handleDiscover() {
-    setLoading(true); setMsg(null); setOutput(null);
+    setLoading(true);
+    setDiscoverRunning(true);
+    setMsg(null);
+    setOutput(null);
     try {
       const r = await runDiscoverWallets(days, limit, source);
       setOutput(r);
       setMsg(r.exit_code === 0 ? "discover_wallets: OK" : `discover_wallets: exit_code=${r.exit_code}`);
       await refresh();
     } catch (e) { setMsg(`Error: ${String(e)}`); }
-    finally { setLoading(false); }
+    finally { setLoading(false); setDiscoverRunning(false); }
   }
 
   return (
@@ -257,25 +262,59 @@ export default function ControlPage() {
           )}
         </div>
 
-        {output && (
-          <div className="mt-4 text-xs">
-            <div className="text-zinc-400 font-mono bg-zinc-950 border border-zinc-800 rounded px-3 py-2">
-              <div className="text-zinc-500">command</div>
-              <div className="break-all">{output.command}</div>
-              <div className="mt-2 text-zinc-500">exit_code</div>
-              <div className={output.exit_code === 0 ? "text-green-400" : "text-red-400"}>{output.exit_code}</div>
-            </div>
-            <div className="mt-3 grid grid-cols-1 gap-3">
-              <div className="bg-zinc-950 border border-zinc-800 rounded p-3">
-                <div className="text-zinc-500 mb-2">stdout</div>
-                <pre className="whitespace-pre-wrap text-zinc-200">{output.stdout || "(empty)"}</pre>
-              </div>
-              {output.stderr && (
-                <div className="bg-zinc-950 border border-zinc-800 rounded p-3">
-                  <div className="text-zinc-500 mb-2">stderr</div>
-                  <pre className="whitespace-pre-wrap text-red-300">{output.stderr}</pre>
+        {/* Log panel — shown as soon as discover runs */}
+        {(discoverRunning || output) && (
+          <div className="mt-4 bg-zinc-950/40 border border-zinc-800 rounded-lg px-3 py-2">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-3">
+                <span className={discoverRunning
+                  ? "w-2 h-2 rounded-full bg-yellow-400 animate-pulse"
+                  : output?.exit_code === 0
+                    ? "w-2 h-2 rounded-full bg-green-500"
+                    : "w-2 h-2 rounded-full bg-red-500"
+                } />
+                <div className="flex flex-col">
+                  <code className="text-zinc-200 text-xs">discover_wallets</code>
+                  <span className="text-[11px] text-zinc-500 font-mono">
+                    {discoverRunning
+                      ? "executando…"
+                      : output
+                        ? `exit_code=${output.exit_code}`
+                        : ""}
+                  </span>
                 </div>
+              </div>
+              {output && (
+                <span className={`text-[11px] font-mono px-2 py-0.5 rounded ${output.exit_code === 0 ? "bg-green-900/40 text-green-400" : "bg-red-900/40 text-red-400"}`}>
+                  {output.exit_code === 0 ? "✓ OK" : `✗ exit ${output.exit_code}`}
+                </span>
               )}
+            </div>
+
+            {output && (
+              <p className="text-[10px] text-zinc-600 font-mono mb-1 truncate" title={output.command}>
+                $ {output.command}
+              </p>
+            )}
+
+            <div className="bg-zinc-950 border border-zinc-800 rounded p-2">
+              <pre ref={discoverLogRef} className="whitespace-pre-wrap text-[11px] leading-4 min-h-[80px] max-h-[320px] overflow-auto">
+                {discoverRunning && !output && (
+                  <span className="text-yellow-400">Aguardando resposta do servidor…{"\n"}</span>
+                )}
+                {output?.stdout && (
+                  <span className="text-zinc-300">{output.stdout}</span>
+                )}
+                {output?.stderr && (
+                  <>
+                    {output.stdout && <span className="text-zinc-600">{"\n"}--- stderr ---{"\n"}</span>}
+                    <span className="text-red-300">{output.stderr}</span>
+                  </>
+                )}
+                {output && !output.stdout && !output.stderr && (
+                  <span className="text-zinc-600">(sem saída)</span>
+                )}
+              </pre>
             </div>
           </div>
         )}
