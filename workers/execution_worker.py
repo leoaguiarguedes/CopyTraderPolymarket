@@ -117,6 +117,10 @@ class ExecutionWorker:
 
         log.info("execution_worker.started", mode=self._s.execution_mode.value)
 
+        # Recover open positions from DB so the exit manager can monitor them
+        # after a restart (the in-memory dict is empty after a process restart).
+        await self._recover_open_positions(exit_mgr)
+
         # Background tasks
         asyncio.create_task(exit_mgr.run_forever())
 
@@ -156,6 +160,49 @@ class ExecutionWorker:
             except Exception as exc:
                 log.error("execution_worker.error", error=str(exc))
                 await asyncio.sleep(1)
+
+    async def _recover_open_positions(self, exit_mgr: ExitManager) -> None:
+        """Load open positions from DB into the exit manager on startup.
+
+        Ensures positions opened in a previous process lifetime are still
+        monitored for TP / SL / timeout after a restart.
+        """
+        from sqlalchemy import select as sa_select
+        from app.execution.base import Position as BasePosition
+
+        try:
+            async with AsyncSessionFactory() as session:
+                result = await session.execute(
+                    sa_select(orm.Position).where(orm.Position.closed_at.is_(None))
+                )
+                open_rows = list(result.scalars())
+
+            for row in open_rows:
+                pos = BasePosition(
+                    position_id=row.position_id,
+                    signal_id=row.signal_id,
+                    strategy=row.strategy,
+                    market_id=row.market_id,
+                    asset_id=row.asset_id,
+                    side=row.side,
+                    entry_price=row.entry_price,
+                    size_usd=row.size_usd,
+                    size_tokens=row.size_tokens if row.size_tokens is not None else Decimal("0"),
+                    tp_price=row.tp_price,
+                    sl_price=row.sl_price,
+                    max_holding_minutes=row.max_holding_minutes,
+                    opened_at=row.opened_at,
+                    order_id=row.order_id,
+                )
+                exit_mgr.positions[pos.position_id] = pos
+
+            if open_rows:
+                log.info(
+                    "execution_worker.positions_recovered",
+                    count=len(open_rows),
+                )
+        except Exception as exc:
+            log.error("execution_worker.recover_failed", error=str(exc)[:120])
 
     async def _build_executor(self, alerter: Alerter) -> BaseExecutor:
         if self._s.execution_mode == ExecutionMode.live:
