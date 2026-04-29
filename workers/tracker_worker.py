@@ -20,6 +20,7 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.data.models import OrderSide, TradeEvent
+from app.data.polymarket_rest import PolymarketRestClient
 from app.storage.db import SessionLocal
 from app.storage import models as orm
 from app.tracker.wallet_tracker import WalletTracker
@@ -137,12 +138,102 @@ async def _persist_trade(event: TradeEvent, wallet_address: str) -> None:
         await session.commit()
 
 
+ENRICH_INTERVAL = 300.0   # enrich pending markets every 5 minutes
+MAX_ENRICH_ATTEMPTS = 3   # after this many failed attempts, mark market as [closed]
+
+# In-memory counter: condition_id → number of failed enrichment attempts
+_enrich_attempts: dict[str, int] = {}
+
+
+async def _enrich_pending_markets(rest: PolymarketRestClient) -> None:
+    """Enrich Market rows with question='[pending]' using the Gamma active-market index.
+
+    Strategy:
+      1. Fetch all currently active markets from Gamma (uses existing paginate method).
+      2. Build a reverse index: decimal_token_id → Gamma Market.
+         (Gamma returns `tokens` as a JSON-string list of decimal outcome token IDs.)
+      3. For each pending DB market, convert its hex condition_id (== hex(token_id)) to
+         decimal and look it up in the index.
+      4. Matched  → update slug / question / category in DB.
+      5. Unmatched after MAX_ENRICH_ATTEMPTS → mark as [closed] so we stop retrying.
+    """
+    import json as _json
+
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(orm.Market).where(orm.Market.question == "[pending]").limit(100)
+        )
+        pending: list[orm.Market] = list(result.scalars())
+
+    if not pending:
+        return
+
+    def _hex_to_dec(hex_id: str) -> str:
+        try:
+            return str(int(hex_id, 16))
+        except Exception:
+            return hex_id
+
+    # Build pending lookup: decimal_token_id → orm.Market
+    pending_by_dec: dict[str, orm.Market] = {
+        _hex_to_dec(m.condition_id): m for m in pending
+    }
+
+    # Fetch all active Gamma markets and build token_id index
+    log.debug("tracker.enrich_fetching_gamma_markets", pending=len(pending))
+    gamma_markets = await rest.get_all_active_markets(max_markets=5000)
+
+    # Build index: decimal_token_id → Gamma Market
+    token_index: dict[str, object] = {}
+    for gm in gamma_markets:
+        for tok in gm.token_ids:
+            token_index[str(tok)] = gm
+
+    updated = 0
+    closed_marked = 0
+
+    async with SessionLocal() as session:
+        for dec_token, pending_market in pending_by_dec.items():
+            db_market = await session.get(orm.Market, pending_market.condition_id)
+            if not db_market:
+                continue
+
+            gamma_match = token_index.get(dec_token)
+            if gamma_match:
+                db_market.question = gamma_match.question or db_market.question
+                db_market.slug = gamma_match.slug or db_market.slug
+                db_market.category = gamma_match.category or db_market.category
+                db_market.updated_at = datetime.now(timezone.utc)
+                updated += 1
+                _enrich_attempts.pop(pending_market.condition_id, None)
+            else:
+                # Track failed attempts and mark as [closed] after threshold
+                attempts = _enrich_attempts.get(pending_market.condition_id, 0) + 1
+                _enrich_attempts[pending_market.condition_id] = attempts
+                if attempts >= MAX_ENRICH_ATTEMPTS:
+                    db_market.question = "[closed]"
+                    db_market.updated_at = datetime.now(timezone.utc)
+                    closed_marked += 1
+                    _enrich_attempts.pop(pending_market.condition_id, None)
+
+        await session.commit()
+
+    log.info(
+        "tracker.markets_enriched",
+        updated=updated,
+        closed_marked=closed_marked,
+        checked=len(pending),
+        gamma_index_size=len(token_index),
+    )
+
+
 async def run() -> None:
     configure_logging()
     settings = get_settings()
     log.info("tracker.starting")
 
     redis_client = aioredis.from_url(settings.redis_url, decode_responses=False)
+    rest = PolymarketRestClient(settings)
     await _ensure_consumer_group(redis_client)
 
     tracker = WalletTracker(tracked_addresses=_load_tracked_addresses())
@@ -158,6 +249,7 @@ async def run() -> None:
     loop.add_signal_handler(signal.SIGINT, _handle_signal)
 
     last_reload = asyncio.get_event_loop().time()
+    last_enrich = 0.0
 
     try:
         while not shutdown.is_set():
@@ -166,6 +258,14 @@ async def run() -> None:
             if now - last_reload >= WALLET_RELOAD_INTERVAL:
                 tracker.reload(_load_tracked_addresses())
                 last_reload = now
+
+            # ── Periodic market enrichment ────────────────────────────────
+            if now - last_enrich >= ENRICH_INTERVAL:
+                try:
+                    await _enrich_pending_markets(rest)
+                except Exception as exc:
+                    log.warning("tracker.enrich_failed", error=str(exc)[:80])
+                last_enrich = now
 
             # ── Read batch from stream ─────────────────────────────────────
             results = await redis_client.xreadgroup(
@@ -227,6 +327,7 @@ async def run() -> None:
                     await redis_client.xack(RAW_STREAM, GROUP_NAME, msg_id)
     finally:
         await redis_client.aclose()
+        await rest.aclose()
         log.info("tracker.stopped")
 
 

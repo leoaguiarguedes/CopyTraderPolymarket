@@ -42,3 +42,11 @@ export function fmtMinutes(mins: number): string {
   const m = Math.round(mins % 60);
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
+
+export function polymarketProfileUrl(address: string): string {
+  return `https://polymarket.com/profile/${address}`;
+}
+
+export function polymarketEventUrl(slug: string): string {
+  return `https://polymarket.com/event/${slug}`;
+}

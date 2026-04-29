@@ -6,7 +6,7 @@ import { PaginationControls, SortHeader, type SortDirection } from "@/components
 import CopyButton from "@/components/CopyButton";
 import Modal, { DetailRow } from "@/components/Modal";
 import { fetchPositions, type Position } from "@/lib/api";
-import { cn, fmtMinutes, fmtTime, fmtUsd, shortAddr } from "@/lib/utils";
+import { cn, fmtMinutes, fmtTime, fmtUsd, shortAddr, polymarketEventUrl } from "@/lib/utils";
 
 const POLL_INTERVAL = 15_000;
 
@@ -30,8 +30,19 @@ function PositionDetailModal({ position, onClose }: { position: Position; onClos
         <DetailRow label="ID da posição" value={position.position_id} mono />
         <DetailRow label="Sinal ID" value={position.signal_id} mono />
         <DetailRow label="Estratégia" value={position.strategy} />
-        <DetailRow label="Mercado" value={<span className="flex items-center gap-1">{shortAddr(position.market_id)}<CopyButton text={position.market_id} /></span>} mono />
+        <DetailRow label="Mercado" value={
+          <span className="flex items-center gap-1 font-mono">
+            {position.market_slug
+              ? <a href={polymarketEventUrl(position.market_slug)} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">{shortAddr(position.market_id)}</a>
+              : shortAddr(position.market_id)
+            }
+            <CopyButton text={position.market_id} />
+          </span>
+        } />
         <DetailRow label="Market ID completo" value={<span className="flex items-center gap-1 break-all">{position.market_id}<CopyButton text={position.market_id} /></span>} mono />
+        {position.market_category && (
+          <DetailRow label="Categoria" value={<span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-xs">{position.market_category}</span>} />
+        )}
         <DetailRow label="Lado" value={<SideBadge side={position.side} />} />
         <DetailRow label="Modo" value={position.execution_mode} />
         <DetailRow label="Preço de entrada" value={position.entry_price.toFixed(6)} mono />

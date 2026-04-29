@@ -5,7 +5,7 @@ import InfoTip from "@/components/InfoTip";
 import { PaginationControls, SortHeader, type SortDirection } from "@/components/TableControls";
 import CopyButton from "@/components/CopyButton";
 import { fetchWallets, type WalletScore } from "@/lib/api";
-import { cn, fmtMinutes, fmtPct, fmtUsd, shortAddr } from "@/lib/utils";
+import { cn, fmtMinutes, fmtPct, fmtUsd, shortAddr, polymarketProfileUrl } from "@/lib/utils";
 
 const POLL_INTERVAL = 30_000;
 
@@ -151,12 +151,28 @@ export default function TradersPageClient() {
                 <td className="px-4 py-3 text-zinc-500 text-xs">{(page - 1) * pageSize + index + 1}</td>
                 <td className="px-4 py-3 text-xs">
                   <div className="flex items-center gap-1">
-                    <span className="font-mono text-zinc-200" title={w.address}>{shortAddr(w.address)}</span>
+                    <a
+                      href={polymarketProfileUrl(w.address)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-cyan-400 hover:underline"
+                      title={w.address}
+                    >
+                      {shortAddr(w.address)}
+                    </a>
                     <CopyButton text={w.address} />
                     {w.proxy_address && (
                       <>
                         <span className="text-zinc-600 ml-1 text-[10px]">proxy:</span>
-                        <span className="font-mono text-zinc-500" title={w.proxy_address}>{shortAddr(w.proxy_address)}</span>
+                        <a
+                          href={polymarketProfileUrl(w.proxy_address)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-zinc-400 hover:underline"
+                          title={w.proxy_address}
+                        >
+                          {shortAddr(w.proxy_address)}
+                        </a>
                         <CopyButton text={w.proxy_address} />
                       </>
                     )}

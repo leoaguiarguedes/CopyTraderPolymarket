@@ -6,7 +6,7 @@ import { PaginationControls, SortHeader, type SortDirection } from "@/components
 import CopyButton from "@/components/CopyButton";
 import Modal, { DetailRow } from "@/components/Modal";
 import { fetchSignals, type Signal } from "@/lib/api";
-import { cn, fmtMinutes, fmtPct, fmtTime, shortAddr } from "@/lib/utils";
+import { cn, fmtMinutes, fmtPct, fmtTime, shortAddr, polymarketProfileUrl, polymarketEventUrl } from "@/lib/utils";
 
 type SortKey =
   | "created_at"
@@ -46,7 +46,13 @@ function SignalDetailModal({ signal, onClose }: { signal: Signal; onClose: () =>
       <div className="flex flex-col gap-0.5">
         <DetailRow label="ID do sinal" value={signal.signal_id} mono />
         <DetailRow label="Estratégia" value={signal.strategy} />
-        <DetailRow label="Mercado" value={signal.market_question || signal.market_id} />
+        <DetailRow label="Mercado" value={
+          signal.market_slug
+            ? <a href={polymarketEventUrl(signal.market_slug)} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline" onClick={(e) => e.stopPropagation()}>
+                {signal.market_question || signal.market_id}
+              </a>
+            : (signal.market_question || signal.market_id)
+        } />
         <DetailRow label="Market ID" value={<span className="flex items-center gap-1">{signal.market_id}<CopyButton text={signal.market_id} /></span>} mono />
         {signal.market_category && (
           <DetailRow label="Categoria" value={<span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-xs">{signal.market_category}</span>} />
@@ -58,7 +64,14 @@ function SignalDetailModal({ signal, onClose }: { signal: Signal; onClose: () =>
         <DetailRow label="Take-profit %" value={fmtPct(signal.tp_pct)} />
         <DetailRow label="Stop-loss %" value={fmtPct(signal.sl_pct)} />
         <DetailRow label="Máx. holding" value={fmtMinutes(signal.max_holding_minutes)} />
-        <DetailRow label="Carteira de origem" value={<span className="flex items-center gap-1">{signal.source_wallet}<CopyButton text={signal.source_wallet} /></span>} mono />
+        <DetailRow label="Carteira de origem" value={
+          <span className="flex items-center gap-1">
+            <a href={polymarketProfileUrl(signal.source_wallet)} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline font-mono" onClick={(e) => e.stopPropagation()}>
+              {signal.source_wallet}
+            </a>
+            <CopyButton text={signal.source_wallet} />
+          </span>
+        } />
         <DetailRow label="Status" value={signal.status} />
         <DetailRow label="Criado em" value={fmtTime(signal.created_at)} />
         {signal.reject_reason && (
@@ -203,13 +216,31 @@ export default function SignalsPageClient() {
               >
                 <td className="px-4 py-3 text-zinc-500 text-xs whitespace-nowrap">{fmtTime(s.created_at)}</td>
                 <td className="px-4 py-3 text-zinc-300 text-xs">{s.strategy}</td>
-                <td className="px-4 py-3 text-xs text-zinc-300 max-w-[140px]">
+                <td className="px-4 py-3 text-xs text-zinc-300 max-w-[160px]">
                   <div className="flex items-center gap-1">
-                    <span className="truncate" title={s.market_question || s.market_id}>
-                      {s.market_question ? s.market_question.slice(0, 40) + (s.market_question.length > 40 ? "…" : "") : shortAddr(s.market_id)}
-                    </span>
+                    {s.market_slug ? (
+                      <a
+                        href={polymarketEventUrl(s.market_slug)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="truncate text-cyan-400 hover:underline"
+                        title={s.market_question || s.market_id}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {s.market_question ? s.market_question.slice(0, 40) + (s.market_question.length > 40 ? "…" : "") : shortAddr(s.market_id)}
+                      </a>
+                    ) : (
+                      <span className="truncate text-zinc-300" title={s.market_question || s.market_id}>
+                        {s.market_question ? s.market_question.slice(0, 40) + (s.market_question.length > 40 ? "…" : "") : shortAddr(s.market_id)}
+                      </span>
+                    )}
                     <CopyButton text={s.market_id} />
                   </div>
+                  {s.market_category && (
+                    <span className="mt-0.5 inline-block px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px]">
+                      {s.market_category}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <SideBadge side={s.side} />
@@ -222,7 +253,16 @@ export default function SignalsPageClient() {
                 <td className="px-4 py-3 text-right text-xs text-zinc-400">{fmtMinutes(s.max_holding_minutes)}</td>
                 <td className="px-4 py-3 text-xs text-zinc-400">
                   <div className="flex items-center gap-1">
-                    <span className="font-mono" title={s.source_wallet}>{shortAddr(s.source_wallet)}</span>
+                    <a
+                      href={polymarketProfileUrl(s.source_wallet)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-cyan-400 hover:underline"
+                      title={s.source_wallet}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {shortAddr(s.source_wallet)}
+                    </a>
                     <CopyButton text={s.source_wallet} />
                   </div>
                 </td>

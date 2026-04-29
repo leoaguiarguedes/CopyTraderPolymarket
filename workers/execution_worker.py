@@ -219,15 +219,47 @@ class ExecutionWorker:
             )
 
         # In live mode: refresh and cache USDC balance before each trade
+        usdc_balance: float | None = None
         if self._s.execution_mode == ExecutionMode.live:
             from app.execution.live_executor import LiveExecutor
             if isinstance(executor, LiveExecutor):
                 try:
-                    balance = await executor.get_usdc_balance()
+                    usdc_balance = await executor.get_usdc_balance()
                     assert self._r is not None
-                    await self._r.set("copytrader:live:usdc_balance", balance, ex=300)
+                    await self._r.set("copytrader:live:usdc_balance", usdc_balance, ex=300)
                 except Exception:
                     pass
+
+        # Balance guard: reject if effective balance < position size
+        position_size_usd = float(sig.size_pct) * float(risk.capital_usd)
+        if self._s.execution_mode == ExecutionMode.live:
+            if usdc_balance is not None and usdc_balance < position_size_usd:
+                log.warning(
+                    "execution_worker.insufficient_balance",
+                    signal_id=sig.signal_id[:8],
+                    usdc_balance=round(usdc_balance, 2),
+                    position_size_usd=round(position_size_usd, 2),
+                )
+                return
+        else:
+            # Paper mode: estimate simulated balance from Redis-cached PnL metrics
+            try:
+                assert self._r is not None
+                pnl_raw = await self._r.get("copytrader:paper:realized_pnl")
+                exposure_raw = await self._r.get("copytrader:paper:open_exposure")
+                realized_pnl = float(pnl_raw) if pnl_raw else 0.0
+                open_exposure = float(exposure_raw) if exposure_raw else 0.0
+                simulated_balance = float(risk.capital_usd) + realized_pnl - open_exposure
+                if simulated_balance < position_size_usd:
+                    log.warning(
+                        "execution_worker.insufficient_simulated_balance",
+                        signal_id=sig.signal_id[:8],
+                        simulated_balance=round(simulated_balance, 2),
+                        position_size_usd=round(position_size_usd, 2),
+                    )
+                    return
+            except Exception:
+                pass  # If we can't read balance, allow the trade
 
         # Open position
         try:

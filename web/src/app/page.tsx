@@ -7,6 +7,7 @@ import StatCard from "@/components/StatCard";
 import EquityCurveChart from "@/components/EquityCurve";
 import SignalFeed from "@/components/SignalFeed";
 import { fmtUsd, fmtPct } from "@/lib/utils";
+import { useTradeConfig } from "@/lib/useTradeConfig";
 
 const POLL_INTERVAL = 30_000;
 
@@ -15,6 +16,7 @@ export default function DashboardPage() {
   const [curve, setCurve] = useState<EquityCurve | null>(null);
   const [sys, setSys] = useState<SystemStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const { config } = useTradeConfig();
 
   async function load() {
     try {
@@ -50,6 +52,16 @@ export default function DashboardPage() {
   const cbMax = sys?.circuit_breaker_max ?? 3;
   const cbRatio = cbMax > 0 ? cbConsecutive / cbMax : 0;
 
+  // Saldo simulado = capital inicial + P&L realizado - exposição em aberto
+  const simulatedBalance = config.capitalUsd + summary.total_pnl_usd - summary.open_exposure_usd;
+  const simulatedBalancePositive = simulatedBalance >= config.capitalUsd;
+
+  // Balance safety: effective balance and whether a new position can be opened
+  const effectiveBalance = isLive
+    ? (sys?.usdc_balance ?? 0)
+    : simulatedBalance;
+  const canOpenPosition = effectiveBalance >= config.positionSizeUsd && effectiveBalance > 0;
+
   return (
     <div className="flex flex-col gap-6">
       {/* Execution mode banner */}
@@ -83,8 +95,21 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Insufficient balance warning */}
+      {!canOpenPosition && (
+        <div className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium bg-amber-950/60 border border-amber-700/60 text-amber-300">
+          <span className="text-lg">⚠️</span>
+          <span>
+            <span className="font-bold">Saldo insuficiente</span> — novas posições bloqueadas.{" "}
+            {isLive
+              ? `Saldo USDC (${fmtUsd(effectiveBalance)}) é menor que o tamanho de posição configurado (${fmtUsd(config.positionSizeUsd)}).`
+              : `Saldo simulado (${fmtUsd(effectiveBalance)}) é menor que o tamanho de posição configurado (${fmtUsd(config.positionSizeUsd)}).`}
+          </span>
+        </div>
+      )}
+
       {/* KPI row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         <StatCard
           label="P/L Total"
           value={fmtUsd(summary.total_pnl_usd)}
@@ -105,13 +130,26 @@ export default function DashboardPage() {
         />
         <StatCard
           label="Posições abertas"
-          value={String(summary.open_positions)}
+          value={`${summary.open_positions}/${config.maxOpenPositions}`}
           sub={fmtUsd(summary.open_exposure_usd) + " em exposição"}
+          negative={summary.open_positions >= config.maxOpenPositions}
+          positive={summary.open_positions === 0}
         />
         <StatCard
-          label={isLive ? "Saldo USDC" : "Capital simulado"}
-          value={isLive && sys?.usdc_balance !== null ? fmtUsd(sys!.usdc_balance!) : fmtUsd(sys?.capital_usd ?? 0)}
-          sub={isLive ? "Disponível na carteira" : "Inicial configurado"}
+          label={isLive ? "Saldo da carteira" : "Saldo simulado"}
+          value={isLive && sys?.usdc_balance != null ? fmtUsd(sys.usdc_balance) : fmtUsd(simulatedBalance)}
+          sub={
+            isLive
+              ? "Saldo real USDC na carteira"
+              : `Capital: ${fmtUsd(config.capitalUsd)} · P&L: ${summary.total_pnl_usd >= 0 ? "+" : ""}${fmtUsd(summary.total_pnl_usd)}`
+          }
+          positive={isLive ? (sys?.usdc_balance ?? 0) > 0 : simulatedBalancePositive}
+          negative={isLive ? false : !simulatedBalancePositive}
+        />
+        <StatCard
+          label="Capital inicial"
+          value={fmtUsd(config.capitalUsd)}
+          sub={`Posição: ${fmtUsd(config.positionSizeUsd)} · Máx. ${config.maxHoldingHours}h`}
         />
         <StatCard
           label="Circuit Breaker"

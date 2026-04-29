@@ -71,6 +71,30 @@ class PolymarketRestClient:
         r.raise_for_status()
         return self._parse_market(r.json())
 
+    async def get_markets_by_token_ids(self, token_ids: list[str]) -> list[Market]:
+        """Lookup markets by their outcome token IDs (decimal strings).
+
+        The Gamma API accepts comma-separated token_ids and returns the parent
+        markets that contain those tokens.  Used to enrich [pending] market stubs
+        created from the subgraph (which only provides token IDs, not slugs).
+        """
+        if not token_ids:
+            return []
+        # Gamma API accepts decimal token_ids (not hex)
+        ids_param = ",".join(token_ids[:50])  # max 50 per request
+        try:
+            r = await self._gamma.get(
+                "/markets",
+                params={"token_ids": ids_param, "limit": len(token_ids[:50])},
+            )
+            r.raise_for_status()
+            payload = r.json()
+            items: list = payload.get("data", payload) if isinstance(payload, dict) else payload
+            return [self._parse_market(m) for m in items if isinstance(m, dict)]
+        except Exception as exc:
+            log.warning("rest.token_id_lookup_failed", error=str(exc)[:80])
+            return []
+
     async def get_all_active_markets(
         self,
         max_markets: int = 2000,

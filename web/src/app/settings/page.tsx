@@ -2,11 +2,24 @@
 import { useState, useEffect } from "react";
 import { toggleKillSwitch, fetchMarketTags, updateMarketTags, fetchEnvStatus, updateEnvVars, resetData } from "@/lib/api";
 import type { MarketTag, EnvStatus, ResetEntity } from "@/lib/api";
+import { useTradeConfig, type TradeConfig } from "@/lib/useTradeConfig";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function SettingsPage() {
+  const { config: tradeConfig, save: saveTradeConfig } = useTradeConfig();
+  // Initialise directly from tradeConfig — it is already synchronously populated from localStorage
+  const [localConfig, setLocalConfig] = useState<TradeConfig>(tradeConfig);
+  const [configMsg, setConfigMsg] = useState<string | null>(null);
+
+  function handleConfigSave() {
+    if (!localConfig) return;
+    saveTradeConfig(localConfig);
+    setConfigMsg("Configurações salvas localmente.");
+    setTimeout(() => setConfigMsg(null), 3000);
+  }
+
   const [ksLoading, setKsLoading] = useState(false);
   const [ksMsg, setKsMsg] = useState<string | null>(null);
 
@@ -245,6 +258,88 @@ export default function SettingsPage() {
                 <p className="text-xs text-zinc-400 bg-zinc-800 rounded px-3 py-2 flex-1">
                   {envMsg}
                 </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Trading params */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+        <h2 className="text-sm font-semibold text-zinc-300 mb-1">Parâmetros de trading</h2>
+        <p className="text-xs text-zinc-500 mb-4">
+          Configurações de risco e simulação. Salvas localmente no navegador.
+        </p>
+        {localConfig && (
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-zinc-400">
+                  Máx. posições abertas <span className="text-zinc-600">(padrão: 15)</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={localConfig.maxOpenPositions}
+                  onChange={(e) => setLocalConfig({ ...localConfig, maxOpenPositions: Number(e.target.value) })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200"
+                />
+                <p className="text-[10px] text-zinc-600">Limite de posições simultâneas abertas.</p>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-zinc-400">
+                  Capital simulado (USD) <span className="text-zinc-600">(padrão: 1000)</span>
+                </label>
+                <input
+                  type="number"
+                  min={100}
+                  step={100}
+                  value={localConfig.capitalUsd}
+                  onChange={(e) => setLocalConfig({ ...localConfig, capitalUsd: Number(e.target.value) })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200"
+                />
+                <p className="text-[10px] text-zinc-600">Capital total simulado para calcular tamanhos.</p>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-zinc-400">
+                  Tamanho por posição (USD) <span className="text-zinc-600">(padrão: 20)</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={localConfig.positionSizeUsd}
+                  onChange={(e) => setLocalConfig({ ...localConfig, positionSizeUsd: Number(e.target.value) })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200"
+                />
+                <p className="text-[10px] text-zinc-600">Valor em USD por posição aberta.</p>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-zinc-400">
+                  Máx. holding (horas) <span className="text-zinc-600">(padrão: 4h)</span>
+                </label>
+                <input
+                  type="number"
+                  min={0.5}
+                  max={720}
+                  step={0.5}
+                  value={localConfig.maxHoldingHours}
+                  onChange={(e) => setLocalConfig({ ...localConfig, maxHoldingHours: Number(e.target.value) })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200"
+                />
+                <p className="text-[10px] text-zinc-600">Tempo máximo antes de forçar saída.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 items-center">
+              <button
+                onClick={handleConfigSave}
+                className="px-4 py-2 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-sm font-medium transition"
+              >
+                Salvar configurações
+              </button>
+              {configMsg && (
+                <p className="text-xs text-green-400 bg-zinc-800 rounded px-3 py-2">{configMsg}</p>
               )}
             </div>
           </div>

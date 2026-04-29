@@ -176,6 +176,16 @@ async def update_env(body: EnvUpdateRequest) -> EnvStatus:
         current[k] = v
 
     _write_env_file(current)
+
+    # Propagate changes to the live OS environment so Settings() re-reads correctly.
+    # (Docker injects env_file as OS env vars at startup; we must mirror changes here.)
+    for k, v in current.items():
+        os.environ[k] = v
+
+    # Invalidate the settings LRU cache so the next request creates a fresh Settings()
+    from app.config import get_settings as _get_settings
+    _get_settings.cache_clear()
+
     return await get_env_status()
 
 

@@ -20,7 +20,11 @@ async def list_signals(
 ):
     """Latest signals with strategy, confidence, status and risk decision."""
     q = (
-        select(orm.Signal, orm.Market.category.label("market_category"))
+        select(
+            orm.Signal,
+            orm.Market.category.label("market_category"),
+            orm.Market.slug.label("market_slug"),
+        )
         .outerjoin(orm.Market, orm.Signal.market_id == orm.Market.condition_id)
         .order_by(orm.Signal.created_at.desc())
         .limit(limit)
@@ -31,16 +35,17 @@ async def list_signals(
         q = q.where(orm.Signal.status == status)
     result = await db.execute(q)
     rows = result.all()
-    return [_signal_to_dict(row[0], row[1]) for row in rows]
+    return [_signal_to_dict(row[0], row[1], row[2]) for row in rows]
 
 
-def _signal_to_dict(s: orm.Signal, market_category: str | None = None) -> dict:
+def _signal_to_dict(s: orm.Signal, market_category: str | None = None, market_slug: str | None = None) -> dict:
     return {
         "signal_id": s.signal_id,
         "strategy": s.strategy,
         "market_id": s.market_id,
         "market_question": s.market_question,
         "market_category": market_category,
+        "market_slug": market_slug,
         "side": s.side,
         "confidence": float(s.confidence),
         "entry_price": float(s.entry_price),

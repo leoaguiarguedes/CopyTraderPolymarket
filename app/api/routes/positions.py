@@ -22,7 +22,11 @@ async def list_positions(
 ):
     """List positions with age and forced-exit countdown."""
     q = (
-        select(orm.Position, orm.Market.category.label("market_category"))
+        select(
+            orm.Position,
+            orm.Market.category.label("market_category"),
+            orm.Market.slug.label("market_slug"),
+        )
         .outerjoin(orm.Market, orm.Position.market_id == orm.Market.condition_id)
         .order_by(orm.Position.opened_at.desc())
         .limit(limit)
@@ -40,10 +44,10 @@ async def list_positions(
     rows = result.all()
 
     now = datetime.now(tz=timezone.utc)
-    return [_position_to_dict(row[0], now, row[1]) for row in rows]
+    return [_position_to_dict(row[0], now, row[1], row[2]) for row in rows]
 
 
-def _position_to_dict(p: orm.Position, now: datetime, market_category: str | None = None) -> dict:
+def _position_to_dict(p: orm.Position, now: datetime, market_category: str | None = None, market_slug: str | None = None) -> dict:
     opened = p.opened_at
     age_min = (now - opened).total_seconds() / 60 if opened else 0.0
     time_to_force_exit = max(0.0, p.max_holding_minutes - age_min) if not p.closed_at else None
@@ -54,6 +58,7 @@ def _position_to_dict(p: orm.Position, now: datetime, market_category: str | Non
         "strategy": p.strategy,
         "market_id": p.market_id,
         "market_category": market_category,
+        "market_slug": market_slug,
         "side": p.side,
         "entry_price": float(p.entry_price),
         "size_usd": float(p.size_usd),
