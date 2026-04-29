@@ -48,11 +48,13 @@ class SignalWorker:
         self._r = aioredis.from_url(self._s.redis_url, decode_responses=False)
         ks = KillSwitch(self._r)
 
-        # Create consumer group if not exists
+        # Create consumer group — use id="0" so a fresh worker processes all
+        # historical messages.  On restart the group already exists (BUSYGROUP),
+        # so the exception is ignored and the current position is preserved.
         try:
-            await self._r.xgroup_create(_STREAM_IN, _GROUP, id="$", mkstream=True)
+            await self._r.xgroup_create(_STREAM_IN, _GROUP, id="0", mkstream=True)
         except aioredis.ResponseError:
-            pass  # group already exists
+            pass  # group already exists — position is preserved
 
         log.info("signal_worker.started")
 

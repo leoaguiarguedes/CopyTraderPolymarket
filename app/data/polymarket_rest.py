@@ -6,7 +6,14 @@ from decimal import Decimal
 from typing import Any
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    """Retry on network errors and 5xx; never retry on 4xx client errors."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code >= 500
+    return isinstance(exc, (httpx.NetworkError, httpx.TimeoutException, httpx.RemoteProtocolError))
 
 from app.config import Settings, get_settings
 from app.data.models import Market, OrderBook, OrderBookLevel, TradeEvent
@@ -221,7 +228,12 @@ class PolymarketRestClient:
 
     # ── Orderbook ─────────────────────────────────────────────────────────
 
-    @retry(wait=wait_exponential(min=1, max=30), stop=stop_after_attempt(5), reraise=True)
+    @retry(
+        wait=wait_exponential(min=1, max=10),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception(_is_retryable),
+        reraise=True,
+    )
     async def get_orderbook(self, token_id: str) -> OrderBook:
         r = await self._clob.get("/book", params={"token_id": token_id})
         r.raise_for_status()

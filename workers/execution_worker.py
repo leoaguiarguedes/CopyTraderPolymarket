@@ -106,9 +106,12 @@ class ExecutionWorker:
             on_close=on_position_closed,
         )
 
-        # Create consumer group
+        # Create consumer group — use id="0" so a fresh worker always processes
+        # all signals from the beginning of the stream.  On restart the group
+        # already exists (BUSYGROUP), so the exception is silently ignored and
+        # the existing position (where we left off) is preserved.
         try:
-            await self._r.xgroup_create(_STREAM_IN, _GROUP, id="$", mkstream=True)
+            await self._r.xgroup_create(_STREAM_IN, _GROUP, id="0", mkstream=True)
         except aioredis.ResponseError:
             pass
 
