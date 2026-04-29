@@ -91,6 +91,8 @@ services:
       redis:
         condition: service_healthy
     command: ["python", "-m", "workers.collector_worker"]
+    healthcheck:
+      disable: true
 
   tracker:
     build:
@@ -109,6 +111,8 @@ services:
       redis:
         condition: service_healthy
     command: ["python", "-m", "workers.tracker_worker"]
+    healthcheck:
+      disable: true
 
   signal_worker:
     build:
@@ -127,6 +131,8 @@ services:
       redis:
         condition: service_healthy
     command: ["python", "-m", "workers.signal_worker"]
+    healthcheck:
+      disable: true
 
   execution_worker:
     build:
@@ -145,6 +151,8 @@ services:
       redis:
         condition: service_healthy
     command: ["python", "-m", "workers.execution_worker"]
+    healthcheck:
+      disable: true
 
 volumes:
   postgres_data:
