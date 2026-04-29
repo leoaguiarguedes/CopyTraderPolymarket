@@ -1,55 +1,46 @@
 wallets:
-- address: '0xda985d751c682615ade741d4415b4917bd9de50b'
+- address: '0x1015bb260154f51e5f432cb0a3227c1619fcbac8'
   label: null
-  median_holding_min: 2.3
-  n_trades: 30
+  median_holding_min: 2.0
+  n_trades: 20
   owner_address: null
-  roi: 0.642
-  sharpe: 0.555
+  roi: 0.5502
+  sharpe: 0.671
   source: discovery_script
-  win_rate: 0.733
-- address: '0xe3e3939bbca17c9b93ad571b0d4900628ac53d1c'
+  win_rate: 0.65
+- address: '0xc5ae17997c95b7fc4aa8aca84e782ad59edd1144'
   label: null
-  median_holding_min: 2.6
-  n_trades: 53
+  median_holding_min: 3.8
+  n_trades: 41
   owner_address: null
-  roi: 1.3311
-  sharpe: 0.466
+  roi: 1.0008
+  sharpe: 0.393
   source: discovery_script
-  win_rate: 0.83
-- address: '0x2c3cd2e6131f823c9a418394cf12249a3bc64683'
+  win_rate: 0.756
+- address: '0x76d4d4703add6e94cfdb1107f3d991d85ff2c512'
   label: null
-  median_holding_min: 3.0
-  n_trades: 96
+  median_holding_min: 2.2
+  n_trades: 72
   owner_address: null
-  roi: 0.4465
-  sharpe: 0.326
+  roi: 0.1516
+  sharpe: 0.349
   source: discovery_script
-  win_rate: 0.5
-- address: '0x6498f9eab8018b2d61fe0186bee145f53e4d8910'
+  win_rate: 0.417
+- address: '0x1ba2b1137313b248b03a9be40093b23d7e96d212'
   label: null
-  median_holding_min: 87.1
-  n_trades: 27
+  median_holding_min: 62.0
+  n_trades: 70
   owner_address: null
-  roi: 0.4816
-  sharpe: 0.25
+  roi: 0.1451
+  sharpe: 0.321
   source: discovery_script
-  win_rate: 0.667
-- address: '0xeaca59cb5e10e0be128b005a0f84465d2ed80729'
+  win_rate: 0.443
+- address: '0x5d5a68ba12cf0264ea2dab626d99abb9a71c4289'
   label: null
-  median_holding_min: 0.6
-  n_trades: 293
+  median_holding_min: 3.3
+  n_trades: 25
   owner_address: null
-  roi: 0.2053
-  sharpe: 0.197
+  roi: 0.9587
+  sharpe: 0.244
   source: discovery_script
-  win_rate: 0.563
-- address: '0x8e4a02ff7248e0b7640dd42fb8dd14c65f7df43d'
-  label: null
-  median_holding_min: 52.5
-  n_trades: 171
-  owner_address: null
-  roi: 0.9637
-  sharpe: 0.149
-  source: discovery_script
-  win_rate: 0.614
+  win_rate: 0.36

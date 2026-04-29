@@ -1,40 +1,31 @@
-# Filtros de categoria de mercado para o coletor
-# Fonte: Gamma API tag_id — https://gamma-api.polymarket.com/markets?tag_id=<id>
-#
-# tracked_tag_ids: lista de IDs dos tags a monitorar.
-# Vazio ([]) = rastrear TODOS os mercados (sem filtro de categoria).
-# Qualquer combinação de IDs aplica um filtro OR na API.
-
 available_tags:
-  - id: 2
-    label: "Política"
-    slug: "politics"
-    description: "Eleições, votações, aprovações presidenciais"
-  - id: 21
-    label: "Cripto"
-    slug: "crypto"
-    description: "Bitcoin, Ethereum, altcoins, DeFi"
-  - id: 120
-    label: "Finanças"
-    slug: "finance"
-    description: "Ações, índices, taxas de juros, macro"
-  - id: 596
-    label: "Cultura"
-    slug: "culture"
-    description: "Entretenimento, celebridades, premiações"
-  - id: 1401
-    label: "Tecnologia"
-    slug: "tech"
-    description: "IA, big tech, lançamentos de produto"
-  - id: 100265
-    label: "Geopolítica"
-    slug: "geopolitics"
-    description: "Conflitos, relações internacionais, sanções"
-  - id: 100639
-    label: "Esportes"
-    slug: "sports"
-    description: "Futebol, basquete, UFC, Fórmula 1"
-
-# IDs ativamente rastreados (edite via /settings ou diretamente aqui).
-# Vazio = todos os mercados.
-tracked_tag_ids: []
+- id: 2
+  label: Política
+  slug: politics
+  description: Eleições, votações, aprovações presidenciais
+- id: 21
+  label: Cripto
+  slug: crypto
+  description: Bitcoin, Ethereum, altcoins, DeFi
+- id: 120
+  label: Finanças
+  slug: finance
+  description: Ações, índices, taxas de juros, macro
+- id: 596
+  label: Cultura
+  slug: culture
+  description: Entretenimento, celebridades, premiações
+- id: 1401
+  label: Tecnologia
+  slug: tech
+  description: IA, big tech, lançamentos de produto
+- id: 100265
+  label: Geopolítica
+  slug: geopolitics
+  description: Conflitos, relações internacionais, sanções
+- id: 100639
+  label: Esportes
+  slug: sports
+  description: Futebol, basquete, UFC, Fórmula 1
+tracked_tag_ids:
+- 21
