@@ -134,6 +134,79 @@ class PolymarketRestClient:
             offset += limit
         return markets[:max_markets]
 
+    async def get_active_events_index(self, max_events: int = 3000) -> dict[str, dict]:
+        """Fetch active Gamma events and build an index: decimal_token_id → info dict.
+
+        The /events endpoint returns events with nested markets[].clobTokenIds
+        (decimal outcome-token IDs) and an event-level slug used in polymarket.com/event/{slug}.
+
+        Returns:
+            dict mapping decimal token-id string →
+              {"slug": str, "question": str, "category": str}
+        """
+        import json as _json
+
+        index: dict[str, dict] = {}
+        limit = 100
+        offset = 0
+
+        while offset < max_events:
+            try:
+                r = await self._gamma.get(
+                    "/events",
+                    params={"active": "true", "limit": limit, "offset": offset},
+                )
+                r.raise_for_status()
+                payload = r.json()
+                items: list = (
+                    payload.get("data", payload) if isinstance(payload, dict) else payload
+                )
+            except Exception as exc:
+                log.warning("rest.events_fetch_failed", offset=offset, error=str(exc)[:80])
+                break
+
+            if not items:
+                break
+
+            for event in items:
+                if not isinstance(event, dict):
+                    continue
+                slug: str = event.get("slug", "") or ""
+                event_question: str = (
+                    event.get("title") or event.get("name") or event.get("question") or ""
+                )
+                category: str = event.get("category") or ""
+
+                for market in event.get("markets") or []:
+                    if not isinstance(market, dict):
+                        continue
+
+                    clob_ids_raw = market.get("clobTokenIds") or []
+                    if isinstance(clob_ids_raw, str):
+                        try:
+                            clob_ids_raw = _json.loads(clob_ids_raw)
+                        except Exception:
+                            clob_ids_raw = []
+
+                    mq: str = (
+                        market.get("question") or market.get("title") or event_question
+                    )
+
+                    for token_id in clob_ids_raw:
+                        tid = str(token_id).strip()
+                        if tid:
+                            index[tid] = {
+                                "slug": slug,
+                                "question": mq or event_question,
+                                "category": category,
+                            }
+
+            if len(items) < limit:
+                break
+            offset += limit
+
+        return index
+
     # ── Proxy wallet ──────────────────────────────────────────────────────
 
     @retry(wait=wait_exponential(min=1, max=30), stop=stop_after_attempt(3), reraise=True)

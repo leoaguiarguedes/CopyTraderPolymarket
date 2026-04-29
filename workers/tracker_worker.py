@@ -5,6 +5,13 @@ Flow:
   2. Consumes Redis Stream raw_trades (consumer group, so restarts don't re-process)
   3. For each trade from a tracked wallet: persist to DB + publish to tracked_trades Stream
   4. Reloads wallet list periodically (config file can be updated without restart)
+
+Market enrichment strategy (Fase 5):
+  - Keeps an in-memory index: decimal_token_id → {slug, question, category}
+  - Refreshes from Gamma /events every INDEX_REFRESH_INTERVAL seconds
+  - When a new Market row is created, the slug/question/category are populated
+    IMMEDIATELY from the index (avoids the [pending] state for short-lived markets)
+  - Falls back to a lazy enrichment pass for any rows that still have [pending]
 """
 from __future__ import annotations
 
@@ -33,6 +40,11 @@ CONSUMER_NAME = "tracker_worker_1"
 BATCH_SIZE = 100
 BLOCK_MS = 5_000            # block up to 5s waiting for new messages
 WALLET_RELOAD_INTERVAL = 60  # reload wallets from yaml every 60s
+
+# In-memory market index: decimal_token_id → {slug, question, category}
+# Built from Gamma /events endpoint.  Refreshed frequently to catch short-lived markets.
+_market_index: dict[str, dict] = {}
+INDEX_REFRESH_INTERVAL = 90.0   # seconds — fast enough to capture 5-minute markets
 
 log = get_logger(__name__)
 
@@ -91,6 +103,29 @@ async def _ensure_consumer_group(redis_client: aioredis.Redis) -> None:
             raise
 
 
+def _lookup_market_info(asset_id_dec: str, market_id_hex: str) -> dict | None:
+    """Look up market info from the in-memory index using decimal token ID.
+
+    The collector stores asset_id as the decimal token ID string from the subgraph
+    and market_id as the hex-encoded form of that same ID.  We try decimal first
+    (direct match), then fall back to converting hex → decimal.
+    """
+    if asset_id_dec:
+        info = _market_index.get(str(asset_id_dec))
+        if info:
+            return info
+
+    # Fallback: convert hex market_id to decimal
+    if market_id_hex:
+        try:
+            dec = str(int(market_id_hex, 16))
+            return _market_index.get(dec)
+        except (ValueError, TypeError):
+            pass
+
+    return None
+
+
 async def _persist_trade(event: TradeEvent, wallet_address: str) -> None:
     async with SessionLocal() as session:
         # Upsert wallet
@@ -104,17 +139,39 @@ async def _persist_trade(event: TradeEvent, wallet_address: str) -> None:
             )
             session.add(wallet)
 
-        # Upsert market stub (full data populated by REST poller later)
+        # Upsert market — try to enrich immediately from in-memory index
         market = await session.get(orm.Market, event.market_id)
         if not market:
+            info = _lookup_market_info(event.asset_id, event.market_id)
             market = orm.Market(
                 condition_id=event.market_id,
-                question="[pending]",
+                question=info["question"] if info and info.get("question") else "[pending]",
+                slug=info["slug"] if info else None,
+                category=info["category"] if info else None,
                 is_active=True,
                 created_at=datetime.now(timezone.utc),
                 updated_at=datetime.now(timezone.utc),
             )
             session.add(market)
+            if info:
+                log.debug(
+                    "tracker.market_enriched_immediately",
+                    market=event.market_id[:16],
+                    slug=info.get("slug"),
+                )
+        elif market.question in ("[pending]", "") and market.slug is None:
+            # Try to enrich existing pending row now that we may have a fresh index
+            info = _lookup_market_info(event.asset_id, event.market_id)
+            if info:
+                market.question = info["question"] or market.question
+                market.slug = info["slug"] or market.slug
+                market.category = info["category"] or market.category
+                market.updated_at = datetime.now(timezone.utc)
+                log.debug(
+                    "tracker.market_enriched_on_trade",
+                    market=event.market_id[:16],
+                    slug=info.get("slug"),
+                )
 
         # Skip duplicate trade
         existing = await session.get(orm.Trade, event.id)
@@ -138,27 +195,27 @@ async def _persist_trade(event: TradeEvent, wallet_address: str) -> None:
         await session.commit()
 
 
-ENRICH_INTERVAL = 300.0   # enrich pending markets every 5 minutes
-MAX_ENRICH_ATTEMPTS = 3   # after this many failed attempts, mark market as [closed]
+async def _refresh_market_index(rest: PolymarketRestClient) -> None:
+    """Refresh the in-memory market index from Gamma /events endpoint."""
+    global _market_index
+    try:
+        new_index = await rest.get_active_events_index(max_events=3000)
+        if new_index:
+            _market_index = new_index
+            log.info("tracker.market_index_refreshed", tokens=len(_market_index))
+        else:
+            log.warning("tracker.market_index_empty")
+    except Exception as exc:
+        log.warning("tracker.market_index_refresh_failed", error=str(exc)[:80])
 
-# In-memory counter: condition_id → number of failed enrichment attempts
-_enrich_attempts: dict[str, int] = {}
 
+async def _enrich_pending_markets() -> None:
+    """Second-pass enrichment: try to enrich any remaining [pending] markets.
 
-async def _enrich_pending_markets(rest: PolymarketRestClient) -> None:
-    """Enrich Market rows with question='[pending]' using the Gamma active-market index.
-
-    Strategy:
-      1. Fetch all currently active markets from Gamma (uses existing paginate method).
-      2. Build a reverse index: decimal_token_id → Gamma Market.
-         (Gamma returns `tokens` as a JSON-string list of decimal outcome token IDs.)
-      3. For each pending DB market, convert its hex condition_id (== hex(token_id)) to
-         decimal and look it up in the index.
-      4. Matched  → update slug / question / category in DB.
-      5. Unmatched after MAX_ENRICH_ATTEMPTS → mark as [closed] so we stop retrying.
+    Uses the in-memory index — no extra HTTP calls needed.  Markets that are
+    closed by the time we run won't be in the index; after MAX_ENRICH_ATTEMPTS
+    they get marked [closed] so we stop retrying.
     """
-    import json as _json
-
     async with SessionLocal() as session:
         result = await session.execute(
             select(orm.Market).where(orm.Market.question == "[pending]").limit(100)
@@ -168,63 +225,55 @@ async def _enrich_pending_markets(rest: PolymarketRestClient) -> None:
     if not pending:
         return
 
-    def _hex_to_dec(hex_id: str) -> str:
-        try:
-            return str(int(hex_id, 16))
-        except Exception:
-            return hex_id
-
-    # Build pending lookup: decimal_token_id → orm.Market
-    pending_by_dec: dict[str, orm.Market] = {
-        _hex_to_dec(m.condition_id): m for m in pending
-    }
-
-    # Fetch all active Gamma markets and build token_id index
-    log.debug("tracker.enrich_fetching_gamma_markets", pending=len(pending))
-    gamma_markets = await rest.get_all_active_markets(max_markets=5000)
-
-    # Build index: decimal_token_id → Gamma Market
-    token_index: dict[str, object] = {}
-    for gm in gamma_markets:
-        for tok in gm.token_ids:
-            token_index[str(tok)] = gm
-
     updated = 0
     closed_marked = 0
 
     async with SessionLocal() as session:
-        for dec_token, pending_market in pending_by_dec.items():
-            db_market = await session.get(orm.Market, pending_market.condition_id)
+        for pm in pending:
+            db_market = await session.get(orm.Market, pm.condition_id)
             if not db_market:
                 continue
 
-            gamma_match = token_index.get(dec_token)
-            if gamma_match:
-                db_market.question = gamma_match.question or db_market.question
-                db_market.slug = gamma_match.slug or db_market.slug
-                db_market.category = gamma_match.category or db_market.category
+            # Try decimal lookup: condition_id is hex(decimal_token_id)
+            info: dict | None = None
+            try:
+                dec = str(int(pm.condition_id, 16))
+                info = _market_index.get(dec)
+            except (ValueError, TypeError):
+                pass
+
+            if info:
+                db_market.question = info["question"] or db_market.question
+                db_market.slug = info["slug"] or db_market.slug
+                db_market.category = info["category"] or db_market.category
                 db_market.updated_at = datetime.now(timezone.utc)
                 updated += 1
-                _enrich_attempts.pop(pending_market.condition_id, None)
+                _enrich_attempts.pop(pm.condition_id, None)
             else:
-                # Track failed attempts and mark as [closed] after threshold
-                attempts = _enrich_attempts.get(pending_market.condition_id, 0) + 1
-                _enrich_attempts[pending_market.condition_id] = attempts
+                attempts = _enrich_attempts.get(pm.condition_id, 0) + 1
+                _enrich_attempts[pm.condition_id] = attempts
                 if attempts >= MAX_ENRICH_ATTEMPTS:
                     db_market.question = "[closed]"
                     db_market.updated_at = datetime.now(timezone.utc)
                     closed_marked += 1
-                    _enrich_attempts.pop(pending_market.condition_id, None)
+                    _enrich_attempts.pop(pm.condition_id, None)
 
         await session.commit()
 
-    log.info(
-        "tracker.markets_enriched",
-        updated=updated,
-        closed_marked=closed_marked,
-        checked=len(pending),
-        gamma_index_size=len(token_index),
-    )
+    if updated or closed_marked:
+        log.info(
+            "tracker.pending_enriched",
+            updated=updated,
+            closed_marked=closed_marked,
+            checked=len(pending),
+        )
+
+
+MAX_ENRICH_ATTEMPTS = 5   # mark as [closed] after this many index misses
+ENRICH_INTERVAL = 120.0   # run second-pass enrichment every 2 minutes
+
+# In-memory counter: condition_id → number of failed enrichment attempts
+_enrich_attempts: dict[str, int] = {}
 
 
 async def run() -> None:
@@ -249,7 +298,11 @@ async def run() -> None:
     loop.add_signal_handler(signal.SIGINT, _handle_signal)
 
     last_reload = asyncio.get_event_loop().time()
+    last_index_refresh = 0.0
     last_enrich = 0.0
+
+    # Build index immediately on startup before processing any messages
+    await _refresh_market_index(rest)
 
     try:
         while not shutdown.is_set():
@@ -259,10 +312,18 @@ async def run() -> None:
                 tracker.reload(_load_tracked_addresses())
                 last_reload = now
 
-            # ── Periodic market enrichment ────────────────────────────────
+            # ── Periodic market index refresh (frequent, catches short-lived markets) ──
+            if now - last_index_refresh >= INDEX_REFRESH_INTERVAL:
+                try:
+                    await _refresh_market_index(rest)
+                except Exception as exc:
+                    log.warning("tracker.index_refresh_failed", error=str(exc)[:80])
+                last_index_refresh = now
+
+            # ── Second-pass enrichment of any remaining [pending] rows ────
             if now - last_enrich >= ENRICH_INTERVAL:
                 try:
-                    await _enrich_pending_markets(rest)
+                    await _enrich_pending_markets()
                 except Exception as exc:
                     log.warning("tracker.enrich_failed", error=str(exc)[:80])
                 last_enrich = now

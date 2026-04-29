@@ -1,46 +1,73 @@
 wallets:
 - address: '0x1015bb260154f51e5f432cb0a3227c1619fcbac8'
   label: null
-  median_holding_min: 2.0
-  n_trades: 20
+  median_holding_min: 1.6
+  n_trades: 31
   owner_address: null
-  roi: 0.5502
-  sharpe: 0.671
+  roi: 0.9049
+  sharpe: 0.639
   source: discovery_script
-  win_rate: 0.65
-- address: '0xc5ae17997c95b7fc4aa8aca84e782ad59edd1144'
+  win_rate: 0.677
+- address: '0x4c353dd347c2e7d8bcdc5cd6ee569de7baf23e2f'
   label: null
-  median_holding_min: 3.8
-  n_trades: 41
+  median_holding_min: 7.4
+  n_trades: 22
   owner_address: null
-  roi: 1.0008
-  sharpe: 0.393
+  roi: 1.5442
+  sharpe: 0.506
   source: discovery_script
-  win_rate: 0.756
-- address: '0x76d4d4703add6e94cfdb1107f3d991d85ff2c512'
+  win_rate: 0.909
+- address: '0xd44e29936409019f93993de8bd603ef6cb1bb15e'
   label: null
-  median_holding_min: 2.2
-  n_trades: 72
+  median_holding_min: 8.6
+  n_trades: 33
   owner_address: null
-  roi: 0.1516
+  roi: 4.7729
+  sharpe: 0.499
+  source: discovery_script
+  win_rate: 0.818
+- address: '0x02e48901d1640bc39322e37cd3c027e49216fb3b'
+  label: null
+  median_holding_min: 1.9
+  n_trades: 49
+  owner_address: null
+  roi: 0.1295
   sharpe: 0.349
   source: discovery_script
-  win_rate: 0.417
-- address: '0x1ba2b1137313b248b03a9be40093b23d7e96d212'
-  label: null
-  median_holding_min: 62.0
-  n_trades: 70
-  owner_address: null
-  roi: 0.1451
-  sharpe: 0.321
-  source: discovery_script
-  win_rate: 0.443
-- address: '0x5d5a68ba12cf0264ea2dab626d99abb9a71c4289'
+  win_rate: 0.551
+- address: '0x66ed9d2c4cd99a026c4fbe1a1257ec901ac5b9b5'
   label: null
   median_holding_min: 3.3
-  n_trades: 25
+  n_trades: 217
   owner_address: null
-  roi: 0.9587
-  sharpe: 0.244
+  roi: 1.8359
+  sharpe: 0.28
   source: discovery_script
-  win_rate: 0.36
+  win_rate: 0.885
+- address: '0x24f5bab872129fde97221b3b69ca9eb2013398d2'
+  label: null
+  median_holding_min: 3.9
+  n_trades: 20
+  owner_address: null
+  roi: 0.0577
+  sharpe: 0.21
+  source: discovery_script
+  win_rate: 0.25
+- address: '0x941e9756c3588cdc806d9e1005528a5cdcfa1fbf'
+  label: null
+  median_holding_min: 4.1
+  n_trades: 292
+  owner_address: null
+  roi: 0.5645
+  sharpe: 0.182
+  source: discovery_script
+  win_rate: 0.531
+- address: '0xa5c227c53a1f4b388b86096d8a35b4b53c0d4933'
+  label: null
+  median_holding_min: 1.3
+  n_trades: 86
+  owner_address: null
+  roi: 0.0243
+  sharpe: 0.161
+  source: discovery_script
+  win_rate: 0.256
